@@ -78,24 +78,39 @@ RETRY_UPLOAD   = 3
 # ────────────────────────────────────────────────────────────────────────────────
 
 # ── Auto-update depuis GitHub ────────────────────────────────────────────────────
-VERSION      = "1.5"
+VERSION      = "1.7"
 PATCH_NOTES  = [
-    "Notification Discord apres chaque mise a jour",
-    "Affichage du patch-note dans le salon Discord",
+    "v1.7 : Ajout du pseudo dans la notification de mise a jour",
+    "v1.7 : Notification d erreur envoyee sur Discord si la mise a jour echoue",
 ]
 GITHUB_RAW   = "https://raw.githubusercontent.com/PabloooG/Medal_to_discord/main/medal_discord.py"
 
-def notify_update_discord(old_version: str, new_version: str):
-    """Envoie un message de patch-note sur Discord apres une mise a jour."""
+def notify_update_discord(old_version: str, new_version: str, patch_notes: list):
+    """Envoie un message de succes de mise a jour sur Discord."""
     try:
         lines = ["```"]
         lines.append(f"  Mise a jour automatique  v{old_version} -> v{new_version}")
+        lines.append(f"  {PSEUDO}")
         lines.append("")
         lines.append("  Patch-note :")
-        for note in PATCH_NOTES:
+        for note in patch_notes:
             lines.append(f"  * {note}")
         lines.append("")
-        lines.append("  Redemarrage automatique en cours au prochain lancement de l'ordinateur...")
+        lines.append("  Succes!  Prochaine verification au redemarrage de l'ordinateur...")
+        lines.append("```")
+        msg = "\n".join(lines)
+        requests.post(WEBHOOK_URL, json={"content": msg}, timeout=10)
+    except Exception:
+        pass
+
+def notify_error_discord(old_version: str, new_version: str, error_msg: str):
+    """Envoie un message d erreur sur Discord si la mise a jour echoue."""
+    try:
+        lines = ["```"]
+        lines.append(f"  Echec de mise a jour  v{old_version} -> v{new_version}")
+        lines.append(f"  {PSEUDO}")
+        lines.append("")
+        lines.append(f"  Erreur : {error_msg}")
         lines.append("```")
         msg = "\n".join(lines)
         requests.post(WEBHOOK_URL, json={"content": msg}, timeout=10)
@@ -118,7 +133,6 @@ def check_update():
             if line.strip().startswith("VERSION"):
                 latest = line.split("=")[1].strip().strip('"')
                 break
-        # Recupere aussi le PATCH_NOTES du script GitHub
         import ast
         for line in r.text.splitlines():
             if line.strip().startswith("PATCH_NOTES"):
@@ -143,21 +157,31 @@ def check_update():
         except Exception:
             pass
 
-        with open(script_path, "w", encoding="utf-8") as f:
-            f.write(r.text)
-
-        ln_ok(f"Mise a jour v{latest} telechargee !")
-
-        # Notification Discord avec patch-note
-        notify_update_discord(VERSION, latest)
-
-        time.sleep(2)
-        os.execv(sys.executable, [sys.executable] + sys.argv)
+        try:
+            with open(script_path, "w", encoding="utf-8") as f:
+                f.write(r.text)
+            ln_ok(f"Mise a jour v{latest} telechargee !")
+            notify_update_discord(VERSION, latest, patch_notes_github)
+            time.sleep(2)
+            os.execv(sys.executable, [sys.executable] + sys.argv)
+        except Exception as e:
+            err = str(e)
+            ln_err(f"Echec ecriture du script : {err}")
+            notify_error_discord(VERSION, latest, err)
+            # Restauration backup si possible
+            try:
+                import shutil
+                shutil.copy2(backup_path, script_path)
+                ln_warn("Ancien script restaure depuis le backup.")
+            except Exception:
+                pass
 
     except requests.exceptions.ConnectionError:
         ln_warn("Pas de connexion internet — verification update ignoree.")
     except Exception as e:
-        ln_warn(f"Verification update echouee : {e}")
+        err = str(e)
+        ln_warn(f"Verification update echouee : {err}")
+        notify_error_discord(VERSION, "?", err)
 # ────────────────────────────────────────────────────────────────────────────────
 
 stats      = {"traites": 0, "reussis": 0, "echoues": 0, "queue": 0}
