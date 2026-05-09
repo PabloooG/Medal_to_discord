@@ -78,7 +78,7 @@ RETRY_UPLOAD   = 3
 # ────────────────────────────────────────────────────────────────────────────────
 
 # ── Auto-update depuis GitHub ────────────────────────────────────────────────────
-VERSION      = "1.8"
+VERSION      = "1.7"
 PATCH_NOTES  = [
     "v1.7 : Ajout du pseudo dans la notification de mise a jour",
     "v1.7 : Notification d erreur envoyee sur Discord si la mise a jour echoue",
@@ -88,16 +88,15 @@ GITHUB_RAW   = "https://raw.githubusercontent.com/PabloooG/Medal_to_discord/main
 def notify_update_discord(old_version: str, new_version: str, patch_notes: list):
     """Envoie un message de succes de mise a jour sur Discord."""
     try:
-        lines = ["```"]
-        lines.append(f"  Mise a jour automatique  v{old_version} -> v{new_version}")
-        lines.append(f"  {PSEUDO}")
+        lines = []
+        lines.append(f"🔄 **Mise à jour**  v{old_version} → v{new_version}  ✅")
+        lines.append(f"👤 {PSEUDO}")
         lines.append("")
-        lines.append("  Patch-note :")
+        lines.append("📋 **Patch-note**")
         for note in patch_notes:
-            lines.append(f"  * {note}")
+            lines.append(f"  ▸ {note}")
         lines.append("")
-        lines.append("  Succes!  Prochaine verification au redemarrage de l'ordinateur...")
-        lines.append("```")
+        lines.append("⏭️ Prochaine vérif au redémarrage...")
         msg = "\n".join(lines)
         requests.post(WEBHOOK_URL, json={"content": msg}, timeout=10)
     except Exception:
@@ -106,12 +105,12 @@ def notify_update_discord(old_version: str, new_version: str, patch_notes: list)
 def notify_error_discord(old_version: str, new_version: str, error_msg: str):
     """Envoie un message d erreur sur Discord si la mise a jour echoue."""
     try:
-        lines = ["```"]
-        lines.append(f"  Echec de mise a jour  v{old_version} -> v{new_version}")
-        lines.append(f"  {PSEUDO}")
+        lines = []
+        lines.append(f"❌ **Echec mise à jour**  v{old_version} → v{new_version}")
+        lines.append(f"👤 {PSEUDO}")
         lines.append("")
-        lines.append(f"  Erreur : {error_msg}")
-        lines.append("```")
+        lines.append("⚠️ **Erreur**")
+        lines.append(f"  ▸ {error_msg}")
         msg = "\n".join(lines)
         requests.post(WEBHOOK_URL, json={"content": msg}, timeout=10)
     except Exception:
