@@ -78,7 +78,7 @@ RETRY_UPLOAD   = 3
 # ────────────────────────────────────────────────────────────────────────────────
 
 # ── Auto-update depuis GitHub ────────────────────────────────────────────────────
-VERSION      = "1.7"
+VERSION      = "1.8"
 PATCH_NOTES  = [
     "v1.7 : Ajout du pseudo dans la notification de mise a jour",
     "v1.7 : Notification d erreur envoyee sur Discord si la mise a jour echoue",
