@@ -41,8 +41,8 @@ def separator():
 
 # ── CONFIGURATION ──────────────────────────────────────────────────────────────
 WEBHOOK_URL  = "https://discord.com/api/webhooks/1499530486928904312/DvR9lA-bgAXE4omeyDYMP1VHreXcUjD50lhzlVvL5Xei2qmJiJkUDRqfQHV3FYAwD1e1"
-FOLDER       = r"f:\Medal\Clips"
-FFMPEG_PATH  = r"C:\Users\j-phi\Desktop\Medal a Discord\ffmpeg-8.0.1-full_build\bin\ffmpeg.exe"
+FOLDER       = r"F:\Medal\Clips"
+FFMPEG_PATH  = r"C:\\Users\\j-phi\\Desktop\\Medal_to_Discord\\ffmpeg\\bin\ffmpeg.exe"
 FFPROBE_PATH = FFMPEG_PATH.replace("ffmpeg.exe", "ffprobe.exe")
 
 # ── Détection automatique FFmpeg si chemin configuré introuvable ─────────────────
@@ -69,7 +69,7 @@ def _resolve_ffmpeg():
         FFPROBE_PATH = found.replace("ffmpeg.exe", "ffprobe.exe")
 # ─────────────────────────────────────────────────────────────────────────────────
 
-PSEUDO         = "Pablo_G"   # ← Nom affiché sur Discord
+PSEUDO       = "Pablo_G"   # ← Nom affiché sur Discord
 LIMIT_MB       = 10
 MARGE_SECURITE = 0.95
 AUDIO_KBPS     = 128
@@ -78,35 +78,64 @@ RETRY_UPLOAD   = 3
 # ────────────────────────────────────────────────────────────────────────────────
 
 # ── Auto-update depuis GitHub ────────────────────────────────────────────────────
-VERSION      = "1.4"
+VERSION      = "1.5"
+PATCH_NOTES  = [
+    "Notification Discord apres chaque mise a jour",
+    "Affichage du patch-note dans le salon Discord",
+]
 GITHUB_RAW   = "https://raw.githubusercontent.com/PabloooG/Medal_to_discord/main/medal_discord.py"
 
+def notify_update_discord(old_version: str, new_version: str):
+    """Envoie un message de patch-note sur Discord apres une mise a jour."""
+    try:
+        lines = ["```"]
+        lines.append(f"  Mise a jour automatique  v{old_version} -> v{new_version}")
+        lines.append("")
+        lines.append("  Patch-note :")
+        for note in PATCH_NOTES:
+            lines.append(f"  * {note}")
+        lines.append("")
+        lines.append("  Redemarrage automatique en cours au prochain lancement de l'ordinateur...")
+        lines.append("```")
+        msg = "\n".join(lines)
+        requests.post(WEBHOOK_URL, json={"content": msg}, timeout=10)
+    except Exception:
+        pass
+
 def check_update():
-    """Vérifie si une nouvelle version est disponible sur GitHub et met à jour si besoin."""
+    """Verifie si une nouvelle version est disponible sur GitHub et met a jour si besoin."""
     if not SILENT:
         console.print()
-        console.print("  [dim]Vérification des mises à jour...[/]")
+        console.print("  [dim]Verification des mises a jour...[/]")
     try:
         r = requests.get(GITHUB_RAW, timeout=10)
         if r.status_code != 200:
-            ln_warn(f"Impossible de vérifier la version (HTTP {r.status_code})")
+            ln_warn(f"Impossible de verifier la version (HTTP {r.status_code})")
             return
-        # Lit la version directement dans le script GitHub
         latest = "?"
+        patch_notes_github = []
         for line in r.text.splitlines():
             if line.strip().startswith("VERSION"):
                 latest = line.split("=")[1].strip().strip('"')
                 break
+        # Recupere aussi le PATCH_NOTES du script GitHub
+        import ast
+        for line in r.text.splitlines():
+            if line.strip().startswith("PATCH_NOTES"):
+                try:
+                    patch_notes_github = ast.literal_eval(line.split("=", 1)[1].strip())
+                except Exception:
+                    pass
+                break
         if latest == VERSION:
-            ln_ok(f"Version {VERSION} — à jour.")
+            ln_ok(f"Version {VERSION} — a jour.")
             return
 
         ln_warn(f"Nouvelle version {latest} disponible ! (actuelle : {VERSION})")
         if not SILENT:
-            console.print("  [dim cyan]Mise à jour en cours...[/]")
+            console.print("  [dim cyan]Mise a jour en cours...[/]")
 
         script_path = os.path.abspath(__file__)
-        # Sauvegarde de l'ancien fichier au cas où
         backup_path = script_path + ".bak"
         try:
             import shutil
@@ -114,19 +143,21 @@ def check_update():
         except Exception:
             pass
 
-        # On utilise le contenu déjà téléchargé (r.text)
         with open(script_path, "w", encoding="utf-8") as f:
             f.write(r.text)
 
-        ln_ok(f"Mise à jour v{latest} téléchargée ! Redémarrage...")
+        ln_ok(f"Mise a jour v{latest} telechargee !")
+
+        # Notification Discord avec patch-note
+        notify_update_discord(VERSION, latest)
+
         time.sleep(2)
-        # Redémarre le script avec la nouvelle version
         os.execv(sys.executable, [sys.executable] + sys.argv)
 
     except requests.exceptions.ConnectionError:
-        ln_warn("Pas de connexion internet — vérification update ignorée.")
+        ln_warn("Pas de connexion internet — verification update ignoree.")
     except Exception as e:
-        ln_warn(f"Vérification update échouée : {e}")
+        ln_warn(f"Verification update echouee : {e}")
 # ────────────────────────────────────────────────────────────────────────────────
 
 stats      = {"traites": 0, "reussis": 0, "echoues": 0, "queue": 0}
