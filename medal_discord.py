@@ -45,6 +45,30 @@ FOLDER       = r"f:\Medal\Clips"
 FFMPEG_PATH  = r"C:\Users\j-phi\Desktop\Medal a Discord\ffmpeg-8.0.1-full_build\bin\ffmpeg.exe"
 FFPROBE_PATH = FFMPEG_PATH.replace("ffmpeg.exe", "ffprobe.exe")
 
+# ── Détection automatique FFmpeg si chemin configuré introuvable ─────────────────
+def _resolve_ffmpeg():
+    global FFMPEG_PATH, FFPROBE_PATH
+    if os.path.isfile(FFMPEG_PATH):
+        return  # chemin configuré OK
+
+    # 1. Cherche dans Medal_to_Discord\ffmpeg\bin sur le bureau
+    fallback = os.path.join(
+        os.path.expanduser("~"), "Desktop",
+        "Medal_to_Discord", "ffmpeg", "bin", "ffmpeg.exe"
+    )
+    if os.path.isfile(fallback):
+        FFMPEG_PATH  = fallback
+        FFPROBE_PATH = fallback.replace("ffmpeg.exe", "ffprobe.exe")
+        return
+
+    # 2. Cherche ffmpeg.exe dans le PATH système
+    import shutil
+    found = shutil.which("ffmpeg")
+    if found:
+        FFMPEG_PATH  = found
+        FFPROBE_PATH = found.replace("ffmpeg.exe", "ffprobe.exe")
+# ─────────────────────────────────────────────────────────────────────────────────
+
 PSEUDO         = "Pablo_G"   # ← Nom affiché sur Discord
 LIMIT_MB       = 10
 MARGE_SECURITE = 0.95
@@ -54,9 +78,8 @@ RETRY_UPLOAD   = 3
 # ────────────────────────────────────────────────────────────────────────────────
 
 # ── Auto-update depuis GitHub ────────────────────────────────────────────────────
-VERSION      = "1.3"
+VERSION      = "1.4"
 GITHUB_RAW   = "https://raw.githubusercontent.com/PabloooG/Medal_to_discord/main/medal_discord.py"
-GITHUB_VER   = "https://raw.githubusercontent.com/PabloooG/Medal_to_discord/main/version.txt"
 
 def check_update():
     """Vérifie si une nouvelle version est disponible sur GitHub et met à jour si besoin."""
@@ -64,23 +87,23 @@ def check_update():
         console.print()
         console.print("  [dim]Vérification des mises à jour...[/]")
     try:
-        r = requests.get(GITHUB_VER, timeout=5)
+        r = requests.get(GITHUB_RAW, timeout=10)
         if r.status_code != 200:
             ln_warn(f"Impossible de vérifier la version (HTTP {r.status_code})")
             return
-        latest = r.text.strip()
+        # Lit la version directement dans le script GitHub
+        latest = "?"
+        for line in r.text.splitlines():
+            if line.strip().startswith("VERSION"):
+                latest = line.split("=")[1].strip().strip('"')
+                break
         if latest == VERSION:
             ln_ok(f"Version {VERSION} — à jour.")
             return
 
         ln_warn(f"Nouvelle version {latest} disponible ! (actuelle : {VERSION})")
         if not SILENT:
-            console.print("  [dim cyan]Téléchargement de la mise à jour...[/]")
-
-        r2 = requests.get(GITHUB_RAW, timeout=15)
-        if r2.status_code != 200:
-            ln_err(f"Échec du téléchargement (HTTP {r2.status_code})")
-            return
+            console.print("  [dim cyan]Mise à jour en cours...[/]")
 
         script_path = os.path.abspath(__file__)
         # Sauvegarde de l'ancien fichier au cas où
@@ -91,8 +114,9 @@ def check_update():
         except Exception:
             pass
 
+        # On utilise le contenu déjà téléchargé (r.text)
         with open(script_path, "w", encoding="utf-8") as f:
-            f.write(r2.text)
+            f.write(r.text)
 
         ln_ok(f"Mise à jour v{latest} téléchargée ! Redémarrage...")
         time.sleep(2)
@@ -500,7 +524,11 @@ class MedalHandler(FileSystemEventHandler):
 
 # ── Main ──────────────────────────────────────────────────────────────────────────
 def main():
+    ffmpeg_original = FFMPEG_PATH
+    _resolve_ffmpeg()  # ← Détection automatique FFmpeg
     print_header()
+    if FFMPEG_PATH != ffmpeg_original:
+        ln_warn(f"FFmpeg reconfiguré automatiquement : {FFMPEG_PATH}")
     check_update()   # ← Vérification mise à jour au démarrage
     separator()
 
