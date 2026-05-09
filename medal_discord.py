@@ -78,10 +78,14 @@ RETRY_UPLOAD   = 3
 # ────────────────────────────────────────────────────────────────────────────────
 
 # ── Auto-update depuis GitHub ────────────────────────────────────────────────────
-VERSION      = "1.7"
+VERSION      = "2.0"
 PATCH_NOTES  = [
-    "v1.7 : Ajout du pseudo dans la notification de mise a jour",
-    "v1.7 : Notification d erreur envoyee sur Discord si la mise a jour echoue",
+    "v2.0 : Creation de l'installateur automatique (.bat)",
+    "v2.0 : Notification Discord a chaque mise a jour automatique",
+    "v2.0 : Notification Discord en cas d'echec de mise a jour",
+    "v2.0 : Affichage du pseudo (PSEUDO) dans les notifications",
+    "v2.0 : Style visuel des notifications (emojis + markdown)",
+    "v2.0 : Systeme de flag pour garantir la notif apres redemarrage",
 ]
 GITHUB_RAW   = "https://raw.githubusercontent.com/PabloooG/Medal_to_discord/main/medal_discord.py"
 
