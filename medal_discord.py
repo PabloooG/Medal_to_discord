@@ -161,8 +161,9 @@ def check_update():
             with open(script_path, "w", encoding="utf-8") as f:
                 f.write(r.text)
             ln_ok(f"Mise a jour v{latest} telechargee !")
-            notify_update_discord(VERSION, latest, patch_notes_github)
-            time.sleep(2)
+            flag_path = script_path + ".updated"
+            with open(flag_path, "w", encoding="utf-8") as _f:
+                _f.write(f"{VERSION}→{latest}")
             os.execv(sys.executable, [sys.executable] + sys.argv)
         except Exception as e:
             err = str(e)
@@ -585,6 +586,20 @@ def main():
     if FFMPEG_PATH != ffmpeg_original:
         ln_warn(f"FFmpeg reconfiguré automatiquement : {FFMPEG_PATH}")
     check_update()   # ← Vérification mise à jour au démarrage
+
+    # ── Notification mise à jour (flag laissé par l'ancienne instance) ───────────
+    flag_path = os.path.abspath(__file__) + ".updated"
+    if os.path.exists(flag_path):
+        try:
+            with open(flag_path, encoding="utf-8") as _f:
+                _old, _new = _f.read().strip().split("→")
+            os.remove(flag_path)
+            notify_update_discord(_old, _new, PATCH_NOTES)
+            ln_ok(f"Notification mise a jour v{_old} -> v{_new} envoyee sur Discord.")
+        except Exception:
+            pass
+    # ─────────────────────────────────────────────────────────────────────────────
+
     separator()
 
     errors = False
