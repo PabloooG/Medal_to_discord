@@ -64,9 +64,9 @@ def separator():
     if not SILENT: console.rule(style="bright_black")
 
 # ── CONFIGURATION ────────────────────────────────────────────────────────────────
-WEBHOOK_URL  = "https://discord.com/api/webhooks/VOTRE_WEBHOOK"
-FOLDER       = r"C:\Medal\Clips"
-FFMPEG_PATH  = r"C:\Users\VotreNom\Desktop\Medal_to_Discord\ffmpeg\bin\ffmpeg.exe"
+WEBHOOK_URL  = "https://discord.com/api/webhooks/1499530486928904312/DvR9lA-bgAXE4omeyDYMP1VHreXcUjD50lhzlVvL5Xei2qmJiJkUDRqfQHV3FYAwD1e1"
+FOLDER       = r"F:\Medal\Clips"
+FFMPEG_PATH  = r"C:\\Users\\j-phi\\Desktop\\Medal_to_Discord\\ffmpeg\\bin\ffmpeg.exe"
 FFPROBE_PATH = FFMPEG_PATH.replace("ffmpeg.exe", "ffprobe.exe")
 
 # ── Détection automatique FFmpeg si chemin configuré introuvable ─────────────────
@@ -90,7 +90,7 @@ def _resolve_ffmpeg():
         FFMPEG_PATH  = found
         FFPROBE_PATH = found.replace("ffmpeg.exe", "ffprobe.exe")
 
-PSEUDO         = "Joueur"
+PSEUDO       = "Pablo_G"
 LIMIT_MB       = 10
 MARGE_SECURITE = 0.95
 AUDIO_KBPS     = 128
@@ -98,7 +98,7 @@ CLIP_DUREE     = 20
 RETRY_UPLOAD   = 3
 
 # ── Auto-update depuis GitHub ─────────────────────────────────────────────────────
-VERSION     = "2.3"
+VERSION     = "2.4"
 PATCH_NOTES = [
     "v2.3 : Fichier log medal_discord.log avec rotation automatique (500 lignes)",
     "v2.3 : ln_ok / ln_warn / ln_err ecrivent dans le log en mode silencieux",
@@ -186,10 +186,10 @@ def check_update():
             # ── Preservation des variables du client ──────────────────────
             import re as _re
             new_script = r.text
-            new_script = _re.sub(r'WEBHOOK_URL\s*=\s*"[^"]*"', 'WEBHOOK_URL  = "' + WEBHOOK_URL + '"', new_script)
-            new_script = _re.sub(r'FOLDER\s*=\s*r"[^"]*"',     'FOLDER       = r"' + FOLDER + '"',      new_script)
-            new_script = _re.sub(r'PSEUDO\s*=\s*"[^"]*"',       'PSEUDO       = "' + PSEUDO + '"',       new_script)
-            new_script = _re.sub(r'FFMPEG_PATH\s*=\s*r"[^"]*"', 'FFMPEG_PATH  = r"' + FFMPEG_PATH + '"', new_script)
+            new_script = _re.sub(r'WEBHOOK_URL\s*=\s*"[^"]*"', f'WEBHOOK_URL  = "{WEBHOOK_URL}"', new_script)
+            new_script = _re.sub(r'FOLDER\s*=\s*r"[^"]*"',     f'FOLDER       = r"{FOLDER}"',     new_script)
+            new_script = _re.sub(r'PSEUDO\s*=\s*"[^"]*"',       f'PSEUDO       = "{PSEUDO}"',       new_script)
+            new_script = _re.sub(r'FFMPEG_PATH\s*=\s*r"[^"]*"', f'FFMPEG_PATH  = r"{FFMPEG_PATH}"', new_script)
             # ─────────────────────────────────────────────────────────────
             with open(script_path, "w", encoding="utf-8") as f:
                 f.write(new_script)
