@@ -104,7 +104,7 @@ RETRY_UPLOAD   = 3
 # ────────────────────────────────────────────────────────────────────────────────
 
 # ── Auto-update depuis GitHub ────────────────────────────────────────────────────
-VERSION      = "2.0"
+VERSION      = "2.1"
 PATCH_NOTES  = [
     "v2.0 : Creation de l'installateur automatique (.bat)",
     "v2.0 : Notification Discord a chaque mise a jour automatique",
