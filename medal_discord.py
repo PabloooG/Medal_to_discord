@@ -98,14 +98,14 @@ CLIP_DUREE     = 20
 RETRY_UPLOAD   = 3
 
 # ── Auto-update depuis GitHub ─────────────────────────────────────────────────────
-VERSION     = "2.4"
+VERSION     = "2.5"
 PATCH_NOTES = [
+    "v2.5 : Correction preservation pseudo lors des mises a jour automatiques",
+    "v2.5 : Correction bad escape backslash dans les chemins Windows lors des mises a jour",
+    "v2.4 : Preservation dynamique webhook/dossier/pseudo/ffmpeg via variables (plus de valeurs hardcodees)",
     "v2.3 : Fichier log medal_discord.log avec rotation automatique (500 lignes)",
-    "v2.3 : ln_ok / ln_warn / ln_err ecrivent dans le log en mode silencieux",
-    "v2.3 : Preservation du webhook, dossier, pseudo et ffmpeg lors des mises a jour",
     "v2.3 : Notification Discord en cas de crash avec details de l erreur",
     "v2.3 : Demarrage et arret du script logges dans medal_discord.log",
-    "v2.3 : Correction preservation webhook/dossier/pseudo apres mise a jour automatique",
 ]
 GITHUB_RAW  = "https://raw.githubusercontent.com/PabloooG/Medal_to_discord/main/medal_discord.py"
 
@@ -185,11 +185,13 @@ def check_update():
         try:
             # ── Preservation des variables du client ──────────────────────
             import re as _re
+            _folder     = FOLDER.replace("\\", "\\\\")
+            _ffmpeg     = FFMPEG_PATH.replace("\\", "\\\\")
             new_script = r.text
             new_script = _re.sub(r'WEBHOOK_URL\s*=\s*"[^"]*"', f'WEBHOOK_URL  = "{WEBHOOK_URL}"', new_script)
-            new_script = _re.sub(r'FOLDER\s*=\s*r"[^"]*"',     f'FOLDER       = r"{FOLDER}"',     new_script)
-            new_script = _re.sub(r'PSEUDO\s*=\s*"[^"]*"',       f'PSEUDO       = "{PSEUDO}"',       new_script)
-            new_script = _re.sub(r'FFMPEG_PATH\s*=\s*r"[^"]*"', f'FFMPEG_PATH  = r"{FFMPEG_PATH}"', new_script)
+            new_script = _re.sub(r'FOLDER\s*=\s*r"[^"]*"',     f'FOLDER       = r"{_folder}"',    new_script)
+            new_script = _re.sub(r'PSEUDO\s*=\s*"[^"]*"',       f'PSEUDO       = "{PSEUDO}"',      new_script)
+            new_script = _re.sub(r'FFMPEG_PATH\s*=\s*r"[^"]*"', f'FFMPEG_PATH  = r"{_ffmpeg}"',    new_script)
             # ─────────────────────────────────────────────────────────────
             with open(script_path, "w", encoding="utf-8") as f:
                 f.write(new_script)
