@@ -17,29 +17,6 @@ from threading import Thread, Lock
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
-# ── Log file ─────────────────────────────────────────────────────────────────────
-LOG_FILE     = os.path.join(os.path.dirname(os.path.abspath(__file__)), "medal_discord.log")
-LOG_MAX_LINES = 500
-
-def log_write(level: str, msg: str):
-    """Ecrit une ligne dans le fichier log avec rotation automatique."""
-    try:
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        line = f"[{timestamp}] [{level}] {msg}\n"
-        # Lire les lignes existantes
-        lines = []
-        if os.path.exists(LOG_FILE):
-            with open(LOG_FILE, "r", encoding="utf-8") as f:
-                lines = f.readlines()
-        # Rotation : garder seulement les dernières LOG_MAX_LINES
-        lines.append(line)
-        if len(lines) > LOG_MAX_LINES:
-            lines = lines[-LOG_MAX_LINES:]
-        with open(LOG_FILE, "w", encoding="utf-8") as f:
-            f.writelines(lines)
-    except Exception:
-        pass
-
 # ── Détection mode silencieux ────────────────────────────────────────────────────
 # pythonw.exe n'a pas de console (sys.stdout est None)
 SILENT = sys.stdout is None
@@ -51,15 +28,12 @@ if not SILENT:
     console = Console(highlight=False)
 
 def ln_ok(msg):
-    log_write("OK  ", msg)
     if not SILENT: console.print(Text.assemble(("✔ ", "bold green"), (msg, "green")))
 
 def ln_warn(msg):
-    log_write("WARN", msg)
     if not SILENT: console.print(Text.assemble(("⚠ ", "bold yellow"), (msg, "yellow")))
 
 def ln_err(msg):
-    log_write("ERR ", msg)
     if not SILENT: console.print(Text.assemble(("✖ ", "bold red"), (msg, "red")))
 
 def separator():
@@ -106,12 +80,11 @@ RETRY_UPLOAD   = 3
 # ── Auto-update depuis GitHub ────────────────────────────────────────────────────
 VERSION      = "2.1"
 PATCH_NOTES  = [
-    "v2.0 : Creation de l'installateur automatique (.bat)",
-    "v2.0 : Notification Discord a chaque mise a jour automatique",
-    "v2.0 : Notification Discord en cas d'echec de mise a jour",
-    "v2.0 : Affichage du pseudo (PSEUDO) dans les notifications",
-    "v2.0 : Style visuel des notifications (emojis + markdown)",
-    "v2.0 : Systeme de flag pour garantir la notif apres redemarrage",
+    "v2.1 : Fichier log medal_discord.log avec rotation automatique (500 lignes)",
+    "v2.1 : ln_ok / ln_warn / ln_err ecrivent dans le log en mode silencieux",
+    "v2.1 : Preservation du webhook, dossier, pseudo et ffmpeg lors des mises a jour",
+    "v2.1 : Notification Discord en cas de crash avec details de l erreur",
+    "v2.1 : Demarrage et arret du script logges dans medal_discord.log",
 ]
 GITHUB_RAW   = "https://raw.githubusercontent.com/PabloooG/Medal_to_discord/main/medal_discord.py"
 
@@ -187,16 +160,8 @@ def check_update():
             pass
 
         try:
-            # ── Preservation des variables du client ──────────────────────
-            import re as _re
-            new_script = r.text
-            new_script = _re.sub(r'WEBHOOK_URL\s*=\s*"[^"]*"', 'WEBHOOK_URL  = "' + WEBHOOK_URL + '"', new_script)
-            new_script = _re.sub(r'FOLDER\s*=\s*r"[^"]*"', 'FOLDER       = r"' + FOLDER + '"', new_script)
-            new_script = _re.sub(r'PSEUDO\s*=\s*"[^"]*"', 'PSEUDO       = "' + PSEUDO + '"', new_script)
-            new_script = _re.sub(r'FFMPEG_PATH\s*=\s*r"[^"]*"', 'FFMPEG_PATH  = r"' + FFMPEG_PATH + '"', new_script)
-            # ─────────────────────────────────────────────────────────────
             with open(script_path, "w", encoding="utf-8") as f:
-                f.write(new_script)
+                f.write(r.text)
             ln_ok(f"Mise a jour v{latest} telechargee !")
             flag_path = script_path + ".updated"
             with open(flag_path, "w", encoding="utf-8") as _f:
@@ -707,25 +672,4 @@ def main():
 
 
 if __name__ == "__main__":
-    log_write("INFO", f"Script demarre v{VERSION}")
-    try:
-        main()
-    except KeyboardInterrupt:
-        log_write("INFO", "Script arrete par l'utilisateur")
-    except Exception as e:
-        import traceback
-        err_detail = traceback.format_exc()
-        log_write("ERR ", f"CRASH : {e}\n{err_detail}")
-        try:
-            lines = []
-            lines.append(f"\u26a0\ufe0f **Crash du script**  v{VERSION}")
-            lines.append(f"\U0001f464 {PSEUDO}")
-            lines.append("")
-            lines.append("\U0001f4cb **Erreur**")
-            lines.append(f"  \u25b8 {e}")
-            lines.append("")
-            lines.append("\U0001f527 Verifiez le fichier `medal_discord.log` pour plus de details.")
-            msg = "\n".join(lines)
-            requests.post(WEBHOOK_URL, json={"content": msg}, timeout=10)
-        except Exception:
-            pass
+    main()
