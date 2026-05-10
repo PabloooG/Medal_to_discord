@@ -98,14 +98,14 @@ CLIP_DUREE     = 20
 RETRY_UPLOAD   = 3
 
 # ── Auto-update depuis GitHub ─────────────────────────────────────────────────────
-VERSION     = "2.2"
+VERSION     = "2.3"
 PATCH_NOTES = [
-    "v2.2 : Fichier log medal_discord.log avec rotation automatique (500 lignes)",
-    "v2.2 : ln_ok / ln_warn / ln_err ecrivent dans le log en mode silencieux",
-    "v2.2 : Preservation du webhook, dossier, pseudo et ffmpeg lors des mises a jour",
-    "v2.2 : Notification Discord en cas de crash avec details de l erreur",
-    "v2.2 : Demarrage et arret du script logges dans medal_discord.log",
-    "v2.2 : desinstaller.bat genere automatiquement au demarrage du script",
+    "v2.3 : Fichier log medal_discord.log avec rotation automatique (500 lignes)",
+    "v2.3 : ln_ok / ln_warn / ln_err ecrivent dans le log en mode silencieux",
+    "v2.3 : Preservation du webhook, dossier, pseudo et ffmpeg lors des mises a jour",
+    "v2.3 : Notification Discord en cas de crash avec details de l erreur",
+    "v2.3 : Demarrage et arret du script logges dans medal_discord.log",
+    "v2.3 : Correction preservation webhook/dossier/pseudo apres mise a jour automatique",
 ]
 GITHUB_RAW  = "https://raw.githubusercontent.com/PabloooG/Medal_to_discord/main/medal_discord.py"
 
