@@ -17,6 +17,27 @@ from threading import Thread, Lock
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
+# ── Log file ─────────────────────────────────────────────────────────────────────
+LOG_FILE      = os.path.join(os.path.dirname(os.path.abspath(__file__)), "medal_discord.log")
+LOG_MAX_LINES = 500
+
+def log_write(level: str, msg: str):
+    """Ecrit une ligne dans le fichier log avec rotation automatique."""
+    try:
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        line = f"[{timestamp}] [{level}] {msg}\n"
+        lines = []
+        if os.path.exists(LOG_FILE):
+            with open(LOG_FILE, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+        lines.append(line)
+        if len(lines) > LOG_MAX_LINES:
+            lines = lines[-LOG_MAX_LINES:]
+        with open(LOG_FILE, "w", encoding="utf-8") as f:
+            f.writelines(lines)
+    except Exception:
+        pass
+
 # ── Détection mode silencieux ────────────────────────────────────────────────────
 # pythonw.exe n'a pas de console (sys.stdout est None)
 SILENT = sys.stdout is None
@@ -28,30 +49,32 @@ if not SILENT:
     console = Console(highlight=False)
 
 def ln_ok(msg):
+    log_write("OK  ", msg)
     if not SILENT: console.print(Text.assemble(("✔ ", "bold green"), (msg, "green")))
 
 def ln_warn(msg):
+    log_write("WARN", msg)
     if not SILENT: console.print(Text.assemble(("⚠ ", "bold yellow"), (msg, "yellow")))
 
 def ln_err(msg):
+    log_write("ERR ", msg)
     if not SILENT: console.print(Text.assemble(("✖ ", "bold red"), (msg, "red")))
 
 def separator():
     if not SILENT: console.rule(style="bright_black")
 
-# ── CONFIGURATION ──────────────────────────────────────────────────────────────
-WEBHOOK_URL  = "https://discord.com/api/webhooks/1499530486928904312/DvR9lA-bgAXE4omeyDYMP1VHreXcUjD50lhzlVvL5Xei2qmJiJkUDRqfQHV3FYAwD1e1"
-FOLDER       = r"F:\Medal\Clips"
-FFMPEG_PATH  = r"C:\\Users\\j-phi\\Desktop\\Medal_to_Discord\\ffmpeg\\bin\ffmpeg.exe"
+# ── CONFIGURATION ────────────────────────────────────────────────────────────────
+WEBHOOK_URL  = "https://discord.com/api/webhooks/VOTRE_WEBHOOK"
+FOLDER       = r"C:\Medal\Clips"
+FFMPEG_PATH  = r"C:\Users\VotreNom\Desktop\Medal_to_Discord\ffmpeg\bin\ffmpeg.exe"
 FFPROBE_PATH = FFMPEG_PATH.replace("ffmpeg.exe", "ffprobe.exe")
 
 # ── Détection automatique FFmpeg si chemin configuré introuvable ─────────────────
 def _resolve_ffmpeg():
     global FFMPEG_PATH, FFPROBE_PATH
     if os.path.isfile(FFMPEG_PATH):
-        return  # chemin configuré OK
+        return
 
-    # 1. Cherche dans Medal_to_Discord\ffmpeg\bin sur le bureau
     fallback = os.path.join(
         os.path.expanduser("~"), "Desktop",
         "Medal_to_Discord", "ffmpeg", "bin", "ffmpeg.exe"
@@ -61,32 +84,30 @@ def _resolve_ffmpeg():
         FFPROBE_PATH = fallback.replace("ffmpeg.exe", "ffprobe.exe")
         return
 
-    # 2. Cherche ffmpeg.exe dans le PATH système
     import shutil
     found = shutil.which("ffmpeg")
     if found:
         FFMPEG_PATH  = found
         FFPROBE_PATH = found.replace("ffmpeg.exe", "ffprobe.exe")
-# ─────────────────────────────────────────────────────────────────────────────────
 
-PSEUDO       = "Pablo_G"   # ← Nom affiché sur Discord
+PSEUDO         = "Joueur"
 LIMIT_MB       = 10
 MARGE_SECURITE = 0.95
 AUDIO_KBPS     = 128
 CLIP_DUREE     = 20
 RETRY_UPLOAD   = 3
-# ────────────────────────────────────────────────────────────────────────────────
 
-# ── Auto-update depuis GitHub ────────────────────────────────────────────────────
-VERSION      = "2.1"
-PATCH_NOTES  = [
-    "v2.1 : Fichier log medal_discord.log avec rotation automatique (500 lignes)",
-    "v2.1 : ln_ok / ln_warn / ln_err ecrivent dans le log en mode silencieux",
-    "v2.1 : Preservation du webhook, dossier, pseudo et ffmpeg lors des mises a jour",
-    "v2.1 : Notification Discord en cas de crash avec details de l erreur",
-    "v2.1 : Demarrage et arret du script logges dans medal_discord.log",
+# ── Auto-update depuis GitHub ─────────────────────────────────────────────────────
+VERSION     = "2.2"
+PATCH_NOTES = [
+    "v2.2 : Fichier log medal_discord.log avec rotation automatique (500 lignes)",
+    "v2.2 : ln_ok / ln_warn / ln_err ecrivent dans le log en mode silencieux",
+    "v2.2 : Preservation du webhook, dossier, pseudo et ffmpeg lors des mises a jour",
+    "v2.2 : Notification Discord en cas de crash avec details de l erreur",
+    "v2.2 : Demarrage et arret du script logges dans medal_discord.log",
+    "v2.2 : desinstaller.bat genere automatiquement au demarrage du script",
 ]
-GITHUB_RAW   = "https://raw.githubusercontent.com/PabloooG/Medal_to_discord/main/medal_discord.py"
+GITHUB_RAW  = "https://raw.githubusercontent.com/PabloooG/Medal_to_discord/main/medal_discord.py"
 
 def notify_update_discord(old_version: str, new_version: str, patch_notes: list):
     """Envoie un message de succes de mise a jour sur Discord."""
@@ -124,6 +145,7 @@ def check_update():
     if not SILENT:
         console.print()
         console.print("  [dim]Verification des mises a jour...[/]")
+    log_write("INFO", "Verification des mises a jour...")
     try:
         r = requests.get(GITHUB_RAW, timeout=10)
         if r.status_code != 200:
@@ -150,6 +172,7 @@ def check_update():
         ln_warn(f"Nouvelle version {latest} disponible ! (actuelle : {VERSION})")
         if not SILENT:
             console.print("  [dim cyan]Mise a jour en cours...[/]")
+        log_write("INFO", f"Mise a jour {VERSION} -> {latest} en cours...")
 
         script_path = os.path.abspath(__file__)
         backup_path = script_path + ".bak"
@@ -160,8 +183,16 @@ def check_update():
             pass
 
         try:
+            # ── Preservation des variables du client ──────────────────────
+            import re as _re
+            new_script = r.text
+            new_script = _re.sub(r'WEBHOOK_URL\s*=\s*"[^"]*"', 'WEBHOOK_URL  = "' + WEBHOOK_URL + '"', new_script)
+            new_script = _re.sub(r'FOLDER\s*=\s*r"[^"]*"',     'FOLDER       = r"' + FOLDER + '"',      new_script)
+            new_script = _re.sub(r'PSEUDO\s*=\s*"[^"]*"',       'PSEUDO       = "' + PSEUDO + '"',       new_script)
+            new_script = _re.sub(r'FFMPEG_PATH\s*=\s*r"[^"]*"', 'FFMPEG_PATH  = r"' + FFMPEG_PATH + '"', new_script)
+            # ─────────────────────────────────────────────────────────────
             with open(script_path, "w", encoding="utf-8") as f:
-                f.write(r.text)
+                f.write(new_script)
             ln_ok(f"Mise a jour v{latest} telechargee !")
             flag_path = script_path + ".updated"
             with open(flag_path, "w", encoding="utf-8") as _f:
@@ -171,7 +202,6 @@ def check_update():
             err = str(e)
             ln_err(f"Echec ecriture du script : {err}")
             notify_error_discord(VERSION, latest, err)
-            # Restauration backup si possible
             try:
                 import shutil
                 shutil.copy2(backup_path, script_path)
@@ -185,7 +215,8 @@ def check_update():
         err = str(e)
         ln_warn(f"Verification update echouee : {err}")
         notify_error_discord(VERSION, "?", err)
-# ────────────────────────────────────────────────────────────────────────────────
+
+# ─────────────────────────────────────────────────────────────────────────────────
 
 stats      = {"traites": 0, "reussis": 0, "echoues": 0, "queue": 0}
 stats_lock = Lock()
@@ -193,7 +224,7 @@ stats_lock = Lock()
 TEMP_DIR  = os.environ.get("TEMP", os.path.expanduser("~"))
 NO_WINDOW = subprocess.CREATE_NO_WINDOW
 
-# ── Affichage ────────────────────────────────────────────────────────────────────
+# ── Affichage ─────────────────────────────────────────────────────────────────────
 def print_header():
     if SILENT: return
     console.print()
@@ -223,7 +254,7 @@ def print_stats():
     t.append(str(stats["queue"]), style="bold white")
     console.print(t)
 
-# ── File d'attente ───────────────────────────────────────────────────────────────
+# ── File d'attente ────────────────────────────────────────────────────────────────
 clip_queue = Queue()
 
 def worker():
@@ -245,7 +276,7 @@ def worker():
 
 Thread(target=worker, daemon=True).start()
 
-# ── Cleanup ──────────────────────────────────────────────────────────────────────
+# ── Cleanup ───────────────────────────────────────────────────────────────────────
 def cleanup_leftover_tmps():
     cnt = 0
     for f in glob.glob(os.path.join(FOLDER, "**/*_discord*.mp4"), recursive=True):
@@ -259,7 +290,7 @@ def cleanup_leftover_tmps():
 
 atexit.register(cleanup_leftover_tmps)
 
-# ── Utilitaires ──────────────────────────────────────────────────────────────────
+# ── Utilitaires ───────────────────────────────────────────────────────────────────
 def wait_for_file(path: str, timeout: int = 60, stable_secs: int = 3) -> bool:
     deadline     = time.time() + timeout
     last_size    = -1
@@ -312,7 +343,7 @@ def calcul_bitrate_video(duration_s: float, limit_mb: float = LIMIT_MB,
     video_bits  = max(budget_bits - audio_bits, 500_000 * duration_s)
     return int(video_bits / duration_s)
 
-# ── Encodage GPU 2-pass ──────────────────────────────────────────────────────────
+# ── Encodage GPU 2-pass ───────────────────────────────────────────────────────────
 def encode_2pass(input_path: str, output_path: str,
                  trim_start: float, duration: float,
                  video_bps: int) -> int:
@@ -347,7 +378,6 @@ def encode_2pass(input_path: str, output_path: str,
     ]
     labels = ["passe 1/2 (analyse)", "passe 2/2 (encodage)"]
 
-    # ── Mode avec affichage (console disponible) ─────────────────────────────
     if not SILENT:
         with Progress(
             TextColumn("    {task.description}", style="dim"),
@@ -366,19 +396,19 @@ def encode_2pass(input_path: str, output_path: str,
                     prog.update(t, completed=100,
                                 status=f"[bold red]ERREUR[/] [dim]({dt:.1f}s)[/]")
                     console.print(f"    [dim red]{result.stderr[-400:]}[/]")
+                    log_write("ERR ", f"Encodage echoue ({label}) : {result.stderr[-200:]}")
                     for f in glob.glob(passlog + "*"):
                         try: os.remove(f)
                         except Exception: pass
                     return -1
                 prog.update(t, completed=100,
                             status=f"[bold green]OK[/] [dim]{dt:.1f}s[/]")
-
-    # ── Mode silencieux (pythonw / planificateur) ────────────────────────────
     else:
         for cmd in passes:
             result = subprocess.run(cmd, capture_output=True, text=True,
                                     cwd=TEMP_DIR, creationflags=NO_WINDOW)
             if result.returncode != 0:
+                log_write("ERR ", f"Encodage echoue (silencieux) : {result.stderr[-200:]}")
                 for f in glob.glob(passlog + "*"):
                     try: os.remove(f)
                     except Exception: pass
@@ -390,7 +420,7 @@ def encode_2pass(input_path: str, output_path: str,
 
     return os.path.getsize(output_path) if os.path.exists(output_path) else -1
 
-# ── Upload Discord ───────────────────────────────────────────────────────────────
+# ── Upload Discord ────────────────────────────────────────────────────────────────
 def build_discord_message(game: str, size_mb: float,
                            duration: float, video_kbps: int) -> str:
     heure = datetime.now().strftime("%H:%M")
@@ -461,11 +491,12 @@ def upload_discord(result_path: str, message: str) -> object:
 
     return resp
 
-# ── Traitement principal ─────────────────────────────────────────────────────────
+# ── Traitement principal ──────────────────────────────────────────────────────────
 def process_clip(file_path: str):
     name = os.path.basename(file_path)
     game = detect_game(file_path)
 
+    log_write("INFO", f"Clip detecte : {name}")
     separator()
     if not SILENT:
         title = Text()
@@ -559,8 +590,10 @@ def process_clip(file_path: str):
         console.print(fl)
 
     if isinstance(resp, Exception) or resp.status_code not in (200, 201):
+        log_write("ERR ", f"Upload echoue : {resp}")
         with stats_lock: stats["echoues"] += 1
     else:
+        log_write("OK  ", f"Clip envoye : {name}  {size_mb:.2f} MB  {keep:.0f}s  {dt:.1f}s")
         with stats_lock: stats["reussis"] += 1
 
     try: os.remove(converted)
@@ -568,7 +601,7 @@ def process_clip(file_path: str):
 
     with stats_lock: stats["traites"] += 1
 
-# ── Watchdog ─────────────────────────────────────────────────────────────────────
+# ── Watchdog ──────────────────────────────────────────────────────────────────────
 class MedalHandler(FileSystemEventHandler):
     def on_created(self, event):
         if event.is_directory: return
@@ -580,16 +613,82 @@ class MedalHandler(FileSystemEventHandler):
                 stats["queue"] = clip_queue.qsize()
             ln_warn(f"Clip détecté : {os.path.basename(event.src_path)}")
 
+# ── Desinstalleur ─────────────────────────────────────────────────────────────────
+def create_uninstaller():
+    """Genere desinstaller.bat dans le dossier d'installation au demarrage."""
+    try:
+        install_dir = os.path.dirname(os.path.abspath(__file__))
+        uninst_path = os.path.join(install_dir, "desinstaller.bat")
+        startup_vbs = os.path.join(
+            os.environ.get("APPDATA", ""),
+            "Microsoft", "Windows", "Start Menu",
+            "Programs", "Startup", "Medal Discord.vbs"
+        )
+        lines = [
+            "@echo off\n",
+            "chcp 65001 >nul\n",
+            "color 0C\n",
+            "title Medal to Discord - Desinstalleur\n",
+            "echo.\n",
+            "echo  +------------------------------------------------------+\n",
+            "echo  ^|       Medal to Discord  -  Desinstalleur            ^|\n",
+            "echo  +------------------------------------------------------+\n",
+            "echo.\n",
+            "echo  Cette action va supprimer :\n",
+            "echo.\n",
+            "echo    - Le dossier Medal_to_Discord sur le bureau\n",
+            "echo    - Le demarrage automatique Windows\n",
+            "echo.\n",
+            "echo  Tes clips Medal ne seront PAS supprimes.\n",
+            "echo.\n",
+            'set /p "CONFIRM=  Confirmer la desinstallation ? (O/N) > "\n',
+            'if /i not "%CONFIRM%"=="O" (\n',
+            "    echo.\n",
+            "    echo  Desinstallation annulee.\n",
+            "    timeout /t 2 >nul\n",
+            "    exit /b\n",
+            ")\n",
+            "echo.\n",
+            "echo  [1/2] Suppression du demarrage automatique...\n",
+            f'if exist "{startup_vbs}" (\n',
+            f'    del "{startup_vbs}" >nul 2>&1\n',
+            "    echo        OK : demarrage automatique supprime.\n",
+            ") else (\n",
+            "    echo        Deja absent.\n",
+            ")\n",
+            "echo.\n",
+            "echo  [2/2] Suppression du dossier Medal_to_Discord...\n",
+            'cd /d "%USERPROFILE%\\Desktop"\n',
+            f'if exist "{install_dir}" (\n',
+            f'    rmdir /s /q "{install_dir}"\n',
+            "    echo        OK : dossier supprime.\n",
+            ") else (\n",
+            "    echo        Deja absent.\n",
+            ")\n",
+            "echo.\n",
+            "echo  +------------------------------------------------------+\n",
+            "echo  ^|   Desinstallation terminee.                         ^|\n",
+            "echo  ^|   Medal to Discord a ete retire de ce PC.           ^|\n",
+            "echo  +------------------------------------------------------+\n",
+            "echo.\n",
+            "pause\n",
+        ]
+        with open(uninst_path, "w", encoding="utf-8") as f:
+            f.writelines(lines)
+        log_write("INFO", f"desinstaller.bat cree : {uninst_path}")
+    except Exception as e:
+        log_write("WARN", f"Impossible de creer desinstaller.bat : {e}")
+
 # ── Main ──────────────────────────────────────────────────────────────────────────
 def main():
     ffmpeg_original = FFMPEG_PATH
-    _resolve_ffmpeg()  # ← Détection automatique FFmpeg
+    _resolve_ffmpeg()
     print_header()
+    create_uninstaller()
     if FFMPEG_PATH != ffmpeg_original:
         ln_warn(f"FFmpeg reconfiguré automatiquement : {FFMPEG_PATH}")
-    check_update()   # ← Vérification mise à jour au démarrage
+    check_update()
 
-    # ── Notification mise à jour (flag laissé par l'ancienne instance) ───────────
     flag_path = os.path.abspath(__file__) + ".updated"
     if os.path.exists(flag_path):
         try:
@@ -600,7 +699,6 @@ def main():
             ln_ok(f"Notification mise a jour v{_old} -> v{_new} envoyee sur Discord.")
         except Exception:
             pass
-    # ─────────────────────────────────────────────────────────────────────────────
 
     separator()
 
@@ -672,4 +770,25 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    log_write("INFO", f"=== Script demarre v{VERSION} ===")
+    try:
+        main()
+    except KeyboardInterrupt:
+        log_write("INFO", "Script arrete par l'utilisateur")
+    except Exception as e:
+        import traceback
+        err_detail = traceback.format_exc()
+        log_write("ERR ", f"CRASH : {e}\n{err_detail}")
+        try:
+            lines = []
+            lines.append(f"⚠️ **Crash du script**  v{VERSION}")
+            lines.append(f"👤 {PSEUDO}")
+            lines.append("")
+            lines.append("📋 **Erreur**")
+            lines.append(f"  ▸ {e}")
+            lines.append("")
+            lines.append("🔧 Verifiez le fichier `medal_discord.log` pour plus de details.")
+            msg = "\n".join(lines)
+            requests.post(WEBHOOK_URL, json={"content": msg}, timeout=10)
+        except Exception:
+            pass
