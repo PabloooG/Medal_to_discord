@@ -99,7 +99,7 @@ CLIP_DUREE     = 20
 RETRY_UPLOAD   = 3
 
 # ── Auto-update depuis GitHub ─────────────────────────────────────────────────────
-VERSION     = "2.6"
+VERSION     = "2.7"
 PATCH_NOTES = [
     "v2.6 : Notification locale apres chaque clip envoye (overlay, son systeme, toast Windows)",
     "v2.6 : NOTIF_TYPE preservee lors des mises a jour automatiques",
@@ -870,11 +870,31 @@ def main():
         active.append("▶ ", style="bold green")
         active.append("Surveillance active — nouveaux clips seulement...", style="bold green")
         console.print(active)
-        console.print()
+        _print_shortcuts()
 
     try:
         while True:
-            time.sleep(1)
+            if not SILENT and _kbhit():
+                key = _getch().lower()
+                if key == "c":
+                    observer.stop()
+                    observer.join()
+                    print_stats()
+                    config_menu()
+                    # Redémarre l'observer après config
+                    observer = Observer()
+                    observer.schedule(MedalHandler(), FOLDER, recursive=True)
+                    observer.start()
+                    if not SILENT:
+                        separator()
+                        active2 = Text()
+                        active2.append("▶ ", style="bold green")
+                        active2.append("Surveillance reprise...", style="bold green")
+                        console.print(active2)
+                        _print_shortcuts()
+                elif key == "q" or key == "\x03":
+                    raise KeyboardInterrupt
+            time.sleep(0.1)
     except KeyboardInterrupt:
         if not SILENT:
             console.print()
@@ -885,6 +905,159 @@ def main():
     print_stats()
     if not SILENT:
         console.print()
+
+
+# ── Lecture clavier non-bloquante (Windows) ───────────────────────────────────────
+def _kbhit() -> bool:
+    try:
+        import msvcrt
+        return msvcrt.kbhit()
+    except Exception:
+        return False
+
+def _getch() -> str:
+    try:
+        import msvcrt
+        return msvcrt.getwch()
+    except Exception:
+        return ""
+
+def _print_shortcuts():
+    if SILENT: return
+    t = Text()
+    t.append("  [C] ", style="bold cyan")
+    t.append("Config  ", style="dim")
+    t.append("[Q] ", style="bold red")
+    t.append("Quitter", style="dim")
+    console.print(t)
+    console.print()
+
+
+# ── Menu de configuration interactif ─────────────────────────────────────────────
+def config_menu():
+    """Menu interactif pour modifier les variables sans réinstaller."""
+    if SILENT: return
+
+    global WEBHOOK_URL, FOLDER, PSEUDO, FFMPEG_PATH, FFPROBE_PATH, NOTIF_TYPE
+
+    while True:
+        separator()
+        console.print()
+        t = Text()
+        t.append("  ⚙  Configuration", style="bold cyan")
+        console.print(t)
+        console.print()
+
+        # Affiche les valeurs actuelles
+        _cfg_row("1", "Pseudo Discord",      PSEUDO)
+        _cfg_row("2", "Dossier clips Medal", FOLDER)
+        _cfg_row("3", "Webhook Discord",     WEBHOOK_URL[:52] + "..." if len(WEBHOOK_URL) > 52 else WEBHOOK_URL)
+        _cfg_row("4", "Notification locale", f"{NOTIF_TYPE}  "
+                 + {"overlay": "(overlay coin haut-droit)",
+                    "sound":   "(bip audio systeme)",
+                    "windows": "(toast Windows)"}
+                 .get(NOTIF_TYPE, ""))
+        console.print()
+
+        t2 = Text()
+        t2.append("  Choix (1-4) ou ", style="dim")
+        t2.append("[Entrée]", style="bold")
+        t2.append(" pour quitter : ", style="dim")
+        console.print(t2, end="")
+
+        choix = input().strip()
+
+        if choix == "":
+            break
+        elif choix == "1":
+            console.print(f"  Pseudo actuel : [bold]{PSEUDO}[/]  (Entrée pour garder)")
+            console.print("  Nouveau pseudo : ", end="")
+            val = input().strip()
+            if val:
+                PSEUDO = val
+                _save_variable("PSEUDO", f'PSEUDO       = "{PSEUDO}"', r'PSEUDO\s*=\s*"[^"]*"')
+                ln_ok(f"Pseudo mis à jour : {PSEUDO}")
+        elif choix == "2":
+            console.print(f"  Dossier actuel : [bold]{FOLDER}[/]  (Entrée pour garder)")
+            console.print("  Nouveau dossier : ", end="")
+            val = input().strip()
+            if val:
+                if not os.path.isdir(val):
+                    ln_err(f"Dossier introuvable : {val}")
+                else:
+                    FOLDER = val
+                    _save_variable("FOLDER", f'FOLDER       = r"{FOLDER}"', r'FOLDER\s*=\s*r"[^"]*"')
+                    ln_ok(f"Dossier mis à jour : {FOLDER}")
+        elif choix == "3":
+            console.print("  Webhook actuel (Entrée pour garder) :")
+            console.print(f"  [dim]{WEBHOOK_URL}[/]")
+            console.print("  Nouveau webhook : ", end="")
+            val = input().strip()
+            if val:
+                WEBHOOK_URL = val
+                _save_variable("WEBHOOK_URL", f'WEBHOOK_URL  = "{WEBHOOK_URL}"', r'WEBHOOK_URL\s*=\s*"[^"]*"')
+                ln_ok("Webhook mis à jour.")
+        elif choix == "4":
+            _menu_notif()
+        else:
+            ln_warn("Choix invalide.")
+
+    separator()
+
+
+def _cfg_row(key: str, label: str, value: str):
+    """Affiche une ligne de config formatée."""
+    t = Text()
+    t.append(f"  [{key}] ", style="bold cyan")
+    t.append(f"{label:<22}", style="dim")
+    t.append(value, style="bold white")
+    console.print(t)
+
+
+def _menu_notif():
+    """Sous-menu pour choisir le type de notification."""
+    global NOTIF_TYPE
+    console.print()
+    notif_options = [
+        ("1", "overlay",  "Overlay coin haut-droit  (recommandé)"),
+        ("2", "sound",    "Bip audio système Windows"),
+        ("3", "windows",  "Toast natif Windows"),
+    ]
+    for key, val, desc in notif_options:
+        active = " ◀ actuel" if val == NOTIF_TYPE else ""
+        style = "bold cyan" if val == NOTIF_TYPE else "dim"
+        t = Text()
+        t.append(f"  [{key}] ", style="bold cyan")
+        t.append(desc, style=style)
+        t.append(active, style="bold green")
+        console.print(t)
+    console.print()
+    console.print("  Choix (1-3) ou Entrée pour annuler : ", end="")
+    choix = input().strip()
+    mapping = {"1": "overlay", "2": "sound", "3": "windows"}
+    if choix in mapping:
+        NOTIF_TYPE = mapping[choix]
+        _save_variable("NOTIF_TYPE", f'NOTIF_TYPE   = "{NOTIF_TYPE}"', r'NOTIF_TYPE\s*=\s*"[^"]*"')
+        ln_ok(f"Notification mise à jour : {NOTIF_TYPE}")
+        # Test immédiat
+        console.print("  [dim]Test de la notification...[/]")
+        Thread(target=notify_clip_sent, args=("Test", 2.4, 20), daemon=True).start()
+        time.sleep(0.5)
+
+
+def _save_variable(name: str, new_line: str, pattern: str):
+    """Réécrit une variable dans le fichier .py courant."""
+    try:
+        script_path = os.path.abspath(__file__)
+        with open(script_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        import re as _re
+        new_content = _re.sub(pattern, new_line, content)
+        with open(script_path, "w", encoding="utf-8") as f:
+            f.write(new_content)
+        log_write("INFO", f"{name} sauvegarde dans le script.")
+    except Exception as e:
+        ln_err(f"Impossible de sauvegarder {name} : {e}")
 
 
 if __name__ == "__main__":
