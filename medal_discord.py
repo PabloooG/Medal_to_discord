@@ -91,6 +91,7 @@ def _resolve_ffmpeg():
         FFPROBE_PATH = found.replace("ffmpeg.exe", "ffprobe.exe")
 
 PSEUDO       = "Pablo_G"
+NOTIF_TYPE   = "overlay"   # "overlay" | "sound" | "windows"
 LIMIT_MB       = 10
 MARGE_SECURITE = 0.95
 AUDIO_KBPS     = 128
@@ -98,14 +99,14 @@ CLIP_DUREE     = 20
 RETRY_UPLOAD   = 3
 
 # ── Auto-update depuis GitHub ─────────────────────────────────────────────────────
-VERSION     = "2.5"
+VERSION     = "2.6"
 PATCH_NOTES = [
+    "v2.6 : Notification locale apres chaque clip envoye (overlay, son systeme, toast Windows)",
+    "v2.6 : NOTIF_TYPE preservee lors des mises a jour automatiques",
     "v2.5 : Correction preservation pseudo lors des mises a jour automatiques",
     "v2.5 : Correction bad escape backslash dans les chemins Windows lors des mises a jour",
     "v2.4 : Preservation dynamique webhook/dossier/pseudo/ffmpeg via variables (plus de valeurs hardcodees)",
     "v2.3 : Fichier log medal_discord.log avec rotation automatique (500 lignes)",
-    "v2.3 : Notification Discord en cas de crash avec details de l erreur",
-    "v2.3 : Demarrage et arret du script logges dans medal_discord.log",
 ]
 GITHUB_RAW  = "https://raw.githubusercontent.com/PabloooG/Medal_to_discord/main/medal_discord.py"
 
@@ -192,6 +193,7 @@ def check_update():
             new_script = _re.sub(r'FOLDER\s*=\s*r"[^"]*"',     f'FOLDER       = r"{_folder}"',    new_script)
             new_script = _re.sub(r'PSEUDO\s*=\s*"[^"]*"',       f'PSEUDO       = "{PSEUDO}"',      new_script)
             new_script = _re.sub(r'FFMPEG_PATH\s*=\s*r"[^"]*"', f'FFMPEG_PATH  = r"{_ffmpeg}"',    new_script)
+            new_script = _re.sub(r'NOTIF_TYPE\s*=\s*"[^"]*"',   f'NOTIF_TYPE   = "{NOTIF_TYPE}"',  new_script)
             # ─────────────────────────────────────────────────────────────
             with open(script_path, "w", encoding="utf-8") as f:
                 f.write(new_script)
@@ -597,11 +599,125 @@ def process_clip(file_path: str):
     else:
         log_write("OK  ", f"Clip envoye : {name}  {size_mb:.2f} MB  {keep:.0f}s  {dt:.1f}s")
         with stats_lock: stats["reussis"] += 1
+        Thread(target=notify_clip_sent, args=(game, size_mb, keep), daemon=True).start()
 
     try: os.remove(converted)
     except Exception: pass
 
     with stats_lock: stats["traites"] += 1
+
+# ── Notifications locales ─────────────────────────────────────────────────────────
+def notify_clip_sent(game: str, size_mb: float, duration: float):
+    """Declenche la notification locale selon NOTIF_TYPE apres un envoi reussi."""
+    try:
+        if NOTIF_TYPE == "sound":
+            _notif_sound()
+        elif NOTIF_TYPE == "windows":
+            _notif_windows_toast(game, size_mb, duration)
+        else:
+            _notif_overlay(game, size_mb, duration)
+    except Exception as e:
+        log_write("WARN", f"Notification locale echouee : {e}")
+
+def _notif_sound():
+    """Bip audio systeme Windows."""
+    import winsound
+    winsound.MessageBeep(winsound.MB_ICONASTERISK)
+
+def _notif_windows_toast(game: str, size_mb: float, duration: float):
+    """Notification native Windows via PowerShell (centre de notifications)."""
+    heure = datetime.now().strftime("%H:%M")
+    title = f"Medal → Discord  ✔"
+    body  = f"{game}  ·  {duration:.0f}s  ·  {size_mb:.1f} MB  ·  {heure}"
+    ps_cmd = (
+        "Add-Type -AssemblyName System.Windows.Forms;"
+        "[System.Windows.Forms.Application]::EnableVisualStyles();"
+        "$n=New-Object System.Windows.Forms.NotifyIcon;"
+        "$n.Icon=[System.Drawing.SystemIcons]::Application;"
+        "$n.Visible=$true;"
+        f"$n.ShowBalloonTip(3000,'{title}','{body}',"
+        "[System.Windows.Forms.ToolTipIcon]::Info);"
+        "Start-Sleep -Milliseconds 3500;"
+        "$n.Dispose()"
+    )
+    subprocess.Popen(
+        ["powershell", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-Command", ps_cmd],
+        creationflags=subprocess.CREATE_NO_WINDOW
+    )
+
+def _notif_overlay(game: str, size_mb: float, duration: float):
+    """Overlay coin haut-droit — fenetre WinForms transparente, 3 secondes."""
+    heure = datetime.now().strftime("%H:%M")
+    line1 = f"✔  Clip envoyé sur Discord"
+    line2 = f"{game}  ·  {duration:.0f}s  ·  {size_mb:.1f} MB  ·  {heure}"
+    # Script PowerShell inline pour l'overlay
+    ps_script = f"""
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Drawing
+
+$screen = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
+$W = 320; $H = 68
+
+$form = New-Object System.Windows.Forms.Form
+$form.FormBorderStyle = 'None'
+$form.ShowInTaskbar   = $false
+$form.TopMost         = $true
+$form.Width  = $W; $form.Height = $H
+$form.Left   = $screen.Right  - $W - 16
+$form.Top    = $screen.Top    + 16
+$form.BackColor   = [System.Drawing.Color]::FromArgb(12,12,24)
+$form.Opacity     = 0.0
+$form.StartPosition = 'Manual'
+
+# Barre accent gauche (neon cyan)
+$accent = New-Object System.Windows.Forms.Panel
+$accent.Location = '0,0'; $accent.Size = '3,{H}'
+$accent.BackColor = [System.Drawing.Color]::FromArgb(0,230,255)
+$form.Controls.Add($accent)
+
+# Ligne 1 : titre
+$l1 = New-Object System.Windows.Forms.Label
+$l1.Text      = '{line1}'
+$l1.Location  = '14,10'; $l1.Size = '300,22'
+$l1.Font      = New-Object System.Drawing.Font('Consolas',10,[System.Drawing.FontStyle]::Bold)
+$l1.ForeColor = [System.Drawing.Color]::FromArgb(0,230,255)
+$l1.BackColor = [System.Drawing.Color]::Transparent
+$form.Controls.Add($l1)
+
+# Ligne 2 : details
+$l2 = New-Object System.Windows.Forms.Label
+$l2.Text      = '{line2}'
+$l2.Location  = '14,34'; $l2.Size = '300,18'
+$l2.Font      = New-Object System.Drawing.Font('Consolas',8)
+$l2.ForeColor = [System.Drawing.Color]::FromArgb(100,160,180)
+$l2.BackColor = [System.Drawing.Color]::Transparent
+$form.Controls.Add($l2)
+
+$form.Show()
+
+# Fade in
+for ($i=0; $i -le 10; $i++) {{
+    $form.Opacity = $i / 10.0
+    [System.Windows.Forms.Application]::DoEvents()
+    Start-Sleep -Milliseconds 30
+}}
+
+Start-Sleep -Milliseconds 2600
+
+# Fade out
+for ($i=10; $i -ge 0; $i--) {{
+    $form.Opacity = $i / 10.0
+    [System.Windows.Forms.Application]::DoEvents()
+    Start-Sleep -Milliseconds 30
+}}
+
+$form.Close()
+$form.Dispose()
+"""
+    subprocess.Popen(
+        ["powershell", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-Command", ps_script],
+        creationflags=subprocess.CREATE_NO_WINDOW
+    )
 
 # ── Watchdog ──────────────────────────────────────────────────────────────────────
 class MedalHandler(FileSystemEventHandler):
