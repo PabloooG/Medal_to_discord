@@ -99,7 +99,7 @@ CLIP_DUREE     = 20
 RETRY_UPLOAD   = 3
 
 # ── Auto-update depuis GitHub ─────────────────────────────────────────────────────
-VERSION     = "3.1"
+VERSION     = "3.5"
 PATCH_NOTES = [
     "v3.1 : Correction SyntaxError unicodeescape lors des mises a jour (chemins Windows avec backslash)",
     "v3.0 : Banque de 15 phrases droles apres chaque clip + 15 phrases pour la touche H",
@@ -192,11 +192,11 @@ def check_update():
             _ffmpeg     = FFMPEG_PATH.replace("\\", "\\\\")
             _notif      = NOTIF_TYPE
             new_script = r.text
-            new_script = _re.sub(r'WEBHOOK_URL\s*=\s*"[^"]*"',  lambda m: f'WEBHOOK_URL  = "{_webhook}"',  new_script)
-            new_script = _re.sub(r'FOLDER\s*=\s*r"[^"]*"',       lambda m: 'FOLDER       = r"' + _folder.replace("\\\\", "\\") + '"',  new_script)
-            new_script = _re.sub(r'PSEUDO\s*=\s*"[^"]*"',         lambda m: f'PSEUDO       = "{_pseudo}"',   new_script)
-            new_script = _re.sub(r'FFMPEG_PATH\s*=\s*r"[^"]*"',   lambda m: 'FFMPEG_PATH  = r"' + _ffmpeg.replace("\\\\", "\\") + '"',  new_script)
-            new_script = _re.sub(r'NOTIF_TYPE\s*=\s*"[^"]*"',     lambda m: f'NOTIF_TYPE   = "{_notif}"',    new_script)
+            new_script = _re.sub(r'WEBHOOK_URL\s*=\s*"[^"]*"',  lambda m: f'WEBHOOK_URL  = "https://discord.com/api/webhooks/1499530486928904312/DvR9lA-bgAXE4omeyDYMP1VHreXcUjD50lhzlVvL5Xei2qmJiJkUDRqfQHV3FYAwD1e1"',  new_script)
+            new_script = _re.sub(r'FOLDER\s*=\s*r"[^"]*"',       lambda m: 'FOLDER       = r"F:\Medal\Clips"\\\\", "\\") + '"',  new_script)
+            new_script = _re.sub(r'PSEUDO\s*=\s*"[^"]*"',         lambda m: f'PSEUDO       = "Pablo_G"',   new_script)
+            new_script = _re.sub(r'FFMPEG_PATH\s*=\s*r"[^"]*"',   lambda m: 'FFMPEG_PATH  = r"C:\Users\j-phi\Desktop\Medal_to_Discord\ffmpeg\bin\ffmpeg.exe"\\\\", "\\") + '"',  new_script)
+            new_script = _re.sub(r'NOTIF_TYPE\s*=\s*"[^"]*"',     lambda m: f'NOTIF_TYPE   = "windows"',    new_script)
             # ─────────────────────────────────────────────────────────────
             with open(script_path, "w", encoding="utf-8") as f:
                 f.write(new_script)
@@ -1136,7 +1136,7 @@ def config_menu():
             val = input().strip()
             if val:
                 PSEUDO = val
-                _save_variable("PSEUDO", f'PSEUDO       = "{PSEUDO}"', r'PSEUDO\s*=\s*"[^"]*"')
+                _save_variable("PSEUDO", f'PSEUDO       = "Pablo_G"', r'PSEUDO\s*=\s*"[^"]*"')
                 ln_ok(f"Pseudo mis à jour : {PSEUDO}")
         elif choix == "2":
             console.print(f"  Dossier actuel : [bold]{FOLDER}[/]  (Entrée pour garder)")
@@ -1147,7 +1147,7 @@ def config_menu():
                     ln_err(f"Dossier introuvable : {val}")
                 else:
                     FOLDER = val
-                    _save_variable("FOLDER", 'FOLDER       = r"' + FOLDER + '"', r'FOLDER\s*=\s*r"[^"]*"')
+                    _save_variable("FOLDER", 'FOLDER       = r"F:\Medal\Clips"', r'FOLDER\s*=\s*r"[^"]*"')
                     ln_ok(f"Dossier mis à jour : {FOLDER}")
         elif choix == "3":
             console.print("  Webhook actuel (Entrée pour garder) :")
@@ -1156,7 +1156,7 @@ def config_menu():
             val = input().strip()
             if val:
                 WEBHOOK_URL = val
-                _save_variable("WEBHOOK_URL", f'WEBHOOK_URL  = "{WEBHOOK_URL}"', r'WEBHOOK_URL\s*=\s*"[^"]*"')
+                _save_variable("WEBHOOK_URL", f'WEBHOOK_URL  = "https://discord.com/api/webhooks/1499530486928904312/DvR9lA-bgAXE4omeyDYMP1VHreXcUjD50lhzlVvL5Xei2qmJiJkUDRqfQHV3FYAwD1e1"', r'WEBHOOK_URL\s*=\s*"[^"]*"')
                 ln_ok("Webhook mis à jour.")
         elif choix == "4":
             _menu_notif()
@@ -1198,7 +1198,7 @@ def _menu_notif():
     mapping = {"1": "overlay", "2": "sound", "3": "windows"}
     if choix in mapping:
         NOTIF_TYPE = mapping[choix]
-        _save_variable("NOTIF_TYPE", f'NOTIF_TYPE   = "{NOTIF_TYPE}"', r'NOTIF_TYPE\s*=\s*"[^"]*"')
+        _save_variable("NOTIF_TYPE", f'NOTIF_TYPE   = "windows"', r'NOTIF_TYPE\s*=\s*"[^"]*"')
         ln_ok(f"Notification mise à jour : {NOTIF_TYPE}")
         # Test immédiat
         console.print("  [dim]Test de la notification...[/]")
