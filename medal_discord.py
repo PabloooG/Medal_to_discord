@@ -1040,9 +1040,18 @@ def _hide_window():
             GWL_EXSTYLE      = -20
             WS_EX_TOOLWINDOW = 0x00000080
             WS_EX_APPWINDOW  = 0x00040000
+            SWP_NOMOVE       = 0x0002
+            SWP_NOSIZE       = 0x0001
+            SWP_NOZORDER     = 0x0004
+            SWP_FRAMECHANGED = 0x0020
             style = _ct.windll.user32.GetWindowLongW(_hwnd, GWL_EXSTYLE)
             style = (style | WS_EX_TOOLWINDOW) & ~WS_EX_APPWINDOW
             _ct.windll.user32.SetWindowLongW(_hwnd, GWL_EXSTYLE, style)
+            # Force Windows a relire le style -> retire l'entree de la barre des taches
+            _ct.windll.user32.SetWindowPos(
+                _hwnd, 0, 0, 0, 0, 0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED
+            )
             _ct.windll.user32.ShowWindow(_hwnd, 0)
     except Exception:
         pass
