@@ -101,12 +101,12 @@ RETRY_UPLOAD   = 3
 # ── Auto-update depuis GitHub ─────────────────────────────────────────────────────
 VERSION     = "3.0"
 PATCH_NOTES = [
-    "v2.8 : Correction definitive bad escape backslash lors des mises a jour et du menu config (lambda re.sub)",
-    "v2.8 : Correction valeurs hardcodees dans le menu config (utilise maintenant les variables reelles)",
+    "v3.0 : Banque de phrases droles apres chaque clip envoye (15 phrases en rotation aleatoire)",
+    "v2.9 : Touche [H] pour cacher completement la fenetre (script toujours actif en arriere-plan)",
+    "v2.9 : Notification locale au demarrage",
+    "v2.8 : Correction definitive bad escape backslash lors des mises a jour et du menu config",
     "v2.6 : Notification locale apres chaque clip envoye (overlay, son systeme, toast Windows)",
-    "v2.6 : NOTIF_TYPE preservee lors des mises a jour automatiques",
-    "v2.5 : Correction preservation pseudo lors des mises a jour automatiques",
-    "v2.4 : Preservation dynamique webhook/dossier/pseudo/ffmpeg via variables (plus de valeurs hardcodees)",
+    "v2.4 : Preservation dynamique webhook/dossier/pseudo/ffmpeg via variables",
 ]
 GITHUB_RAW  = "https://raw.githubusercontent.com/PabloooG/Medal_to_discord/main/medal_discord.py"
 
@@ -609,7 +609,45 @@ def process_clip(file_path: str):
 
     with stats_lock: stats["traites"] += 1
 
-# ── Notifications locales ─────────────────────────────────────────────────────────
+# ── Banque de phrases drôles ──────────────────────────────────────────────────────
+import random
+PHRASES_CLIP = [
+    "Un autre chef-d'oeuvre livre.",
+    "Discord vient de recevoir un banger.",
+    "Clip poste. Gloire eternelle en approche.",
+    "Les gars vont kiffer.",
+    "Vas-y, fais semblant que c'etait prevu.",
+    "Certifie clip de ouf.",
+    "Envoye plus vite que ton ping.",
+    "Historique. Tout simplement.",
+    "T'as encore fait ca toi.",
+    "On encadre et on accroche au mur.",
+    "Tes ennemis ont vu ca. Ils pleurent.",
+    "Clip recu 5 etoiles sur Discord.",
+    "Le serveur a fremi a la reception.",
+    "Quelqu'un quelque part est jaloux.",
+    "Clip livre. Signature en bas a droite.",
+]
+
+PHRASES_HIDE = [
+    "Cache mais toujours la. Comme un ninja.",
+    "Mode fantome active. Tes clips sont en securite.",
+    "Invisible mais sur le coup.",
+    "Tu me vois plus mais je te vois.",
+    "Disparu des radars. Pas des clips.",
+    "Mode discret ON. Tes highlights sont entre de bonnes mains.",
+    "Je suis la, t'inquiete. Comme ton instinct de gamer.",
+    "Fenetre fermee. Concentration maximale.",
+    "Je suis dans les murs maintenant.",
+    "Meme ta mere sait pas que je tourne.",
+    "Cache comme tes skills au debut de la partie.",
+    "J'existe toujours. Philosophiquement parlant.",
+    "Je surveille tes clips depuis les ombres.",
+    "Tu peux pas m'arreter. T'as meme pas essaye.",
+    "Processus 4327 te salue bien.",
+]
+
+
 def notify_clip_sent(game: str, size_mb: float, duration: float):
     """Declenche la notification locale selon NOTIF_TYPE apres un envoi reussi."""
     try:
@@ -629,9 +667,8 @@ def _notif_sound():
 
 def _notif_windows_toast(game: str, size_mb: float, duration: float):
     """Notification native Windows via PowerShell (centre de notifications)."""
-    heure = datetime.now().strftime("%H:%M")
     title = f"Medal → Discord  ✔"
-    body  = f"{game}  ·  {duration:.0f}s  ·  {size_mb:.1f} MB  ·  {heure}"
+    body  = random.choice(PHRASES_CLIP)
     ps_cmd = (
         "Add-Type -AssemblyName System.Windows.Forms;"
         "[System.Windows.Forms.Application]::EnableVisualStyles();"
@@ -650,9 +687,8 @@ def _notif_windows_toast(game: str, size_mb: float, duration: float):
 
 def _notif_overlay(game: str, size_mb: float, duration: float):
     """Overlay coin haut-droit — fenetre WinForms transparente, 3 secondes."""
-    heure = datetime.now().strftime("%H:%M")
-    line1 = f"✔  Clip envoyé sur Discord"
-    line2 = f"{game}  ·  {duration:.0f}s  ·  {size_mb:.1f} MB  ·  {heure}"
+    line1 = "✔  Clip envoyé sur Discord"
+    line2 = random.choice(PHRASES_CLIP)
     # Script PowerShell inline pour l'overlay
     ps_script = f"""
 Add-Type -AssemblyName System.Windows.Forms
@@ -875,6 +911,8 @@ def main():
         console.print(active)
         _print_shortcuts()
 
+    Thread(target=notify_startup, daemon=True).start()
+
     try:
         while True:
             if not SILENT and _kbhit():
@@ -895,6 +933,8 @@ def main():
                         active2.append("Surveillance reprise...", style="bold green")
                         console.print(active2)
                         _print_shortcuts()
+                elif key == "h":
+                    _hide_window()
                 elif key == "q" or key == "\x03":
                     raise KeyboardInterrupt
             time.sleep(0.1)
@@ -930,13 +970,124 @@ def _print_shortcuts():
     t = Text()
     t.append("  [C] ", style="bold cyan")
     t.append("Config  ", style="dim")
+    t.append("[H] ", style="bold yellow")
+    t.append("Cacher  ", style="dim")
     t.append("[Q] ", style="bold red")
     t.append("Quitter", style="dim")
     console.print(t)
     console.print()
 
 
-# ── Menu de configuration interactif ─────────────────────────────────────────────
+def _hide_window():
+    """Cache complètement la fenêtre console (barre des tâches incluse)."""
+    try:
+        import ctypes
+        hwnd = ctypes.windll.kernel32.GetConsoleWindow()
+        if hwnd:
+            ctypes.windll.user32.ShowWindow(hwnd, 0)  # SW_HIDE = 0
+        # Toast de confirmation
+        phrase = random.choice(PHRASES_HIDE)
+        ps_cmd = (
+            "Add-Type -AssemblyName System.Windows.Forms;"
+            "[System.Windows.Forms.Application]::EnableVisualStyles();"
+            "$n=New-Object System.Windows.Forms.NotifyIcon;"
+            "$n.Icon=[System.Drawing.SystemIcons]::Application;"
+            "$n.Visible=$true;"
+            f"$n.ShowBalloonTip(3000,'Medal → Discord  \U0001f47b','{phrase}',"
+            "[System.Windows.Forms.ToolTipIcon]::Info);"
+            "Start-Sleep -Milliseconds 3500;"
+            "$n.Dispose()"
+        )
+        subprocess.Popen(
+            ["powershell", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-Command", ps_cmd],
+            creationflags=subprocess.CREATE_NO_WINDOW
+        )
+    except Exception:
+        pass
+
+def notify_startup():
+    """Notification locale au démarrage selon NOTIF_TYPE."""
+    try:
+        if NOTIF_TYPE == "sound":
+            import winsound
+            winsound.MessageBeep(winsound.MB_ICONASTERISK)
+        elif NOTIF_TYPE == "windows":
+            title = "Medal → Discord  ▶"
+            body  = "Surveillance active"
+            ps_cmd = (
+                "Add-Type -AssemblyName System.Windows.Forms;"
+                "[System.Windows.Forms.Application]::EnableVisualStyles();"
+                "$n=New-Object System.Windows.Forms.NotifyIcon;"
+                "$n.Icon=[System.Drawing.SystemIcons]::Application;"
+                "$n.Visible=$true;"
+                f"$n.ShowBalloonTip(3000,'{title}','{body}',"
+                "[System.Windows.Forms.ToolTipIcon]::Info);"
+                "Start-Sleep -Milliseconds 3500;"
+                "$n.Dispose()"
+            )
+            subprocess.Popen(
+                ["powershell", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-Command", ps_cmd],
+                creationflags=subprocess.CREATE_NO_WINDOW
+            )
+        else:  # overlay
+            line1 = "▶  Medal → Discord actif"
+            line2 = "Surveillance active"
+            ps_script = f"""
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Drawing
+$screen = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
+$W = 320; $H = 68
+$form = New-Object System.Windows.Forms.Form
+$form.FormBorderStyle = 'None'
+$form.ShowInTaskbar   = $false
+$form.TopMost         = $true
+$form.Width  = $W; $form.Height = $H
+$form.Left   = $screen.Right  - $W - 16
+$form.Top    = $screen.Top    + 16
+$form.BackColor   = [System.Drawing.Color]::FromArgb(12,12,24)
+$form.Opacity     = 0.0
+$form.StartPosition = 'Manual'
+$accent = New-Object System.Windows.Forms.Panel
+$accent.Location = '0,0'; $accent.Size = '3,68'
+$accent.BackColor = [System.Drawing.Color]::FromArgb(0,230,255)
+$form.Controls.Add($accent)
+$l1 = New-Object System.Windows.Forms.Label
+$l1.Text      = '{line1}'
+$l1.Location  = '14,10'; $l1.Size = '300,22'
+$l1.Font      = New-Object System.Drawing.Font('Consolas',10,[System.Drawing.FontStyle]::Bold)
+$l1.ForeColor = [System.Drawing.Color]::FromArgb(0,230,255)
+$l1.BackColor = [System.Drawing.Color]::Transparent
+$form.Controls.Add($l1)
+$l2 = New-Object System.Windows.Forms.Label
+$l2.Text      = '{line2}'
+$l2.Location  = '14,34'; $l2.Size = '300,18'
+$l2.Font      = New-Object System.Drawing.Font('Consolas',8)
+$l2.ForeColor = [System.Drawing.Color]::FromArgb(100,160,180)
+$l2.BackColor = [System.Drawing.Color]::Transparent
+$form.Controls.Add($l2)
+$form.Show()
+for ($i=0; $i -le 10; $i++) {{
+    $form.Opacity = $i / 10.0
+    [System.Windows.Forms.Application]::DoEvents()
+    Start-Sleep -Milliseconds 30
+}}
+Start-Sleep -Milliseconds 2600
+for ($i=10; $i -ge 0; $i--) {{
+    $form.Opacity = $i / 10.0
+    [System.Windows.Forms.Application]::DoEvents()
+    Start-Sleep -Milliseconds 30
+}}
+$form.Close()
+$form.Dispose()
+"""
+            subprocess.Popen(
+                ["powershell", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-Command", ps_script],
+                creationflags=subprocess.CREATE_NO_WINDOW
+            )
+    except Exception as e:
+        log_write("WARN", f"Notification démarrage échouée : {e}")
+
+
 def config_menu():
     """Menu interactif pour modifier les variables sans réinstaller."""
     if SILENT: return
