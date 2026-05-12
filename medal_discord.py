@@ -1,6 +1,6 @@
 """
 Medal → Discord  |  GPU h264_nvenc  |  720p  |  20s  |  10 MB max qualité optimale
-Dépendances : pip install rich watchdog requests
+Dépendances : pip install rich watchdog requests pystray pillow
 """
 
 import time
@@ -99,12 +99,12 @@ CLIP_DUREE     = 20
 RETRY_UPLOAD   = 3
 
 # ── Auto-update depuis GitHub ─────────────────────────────────────────────────────
-VERSION     = "3.1"
+VERSION     = "3.2"
 PATCH_NOTES = [
-    "v3.1 : Correction SyntaxError unicodeescape lors des mises a jour (chemins Windows avec backslash)",
+    "v3.2 : Touche [H] minimise dans le system tray avec icone (clic droit pour restaurer ou quitter)",
+    "v3.1 : Correction SyntaxError unicodeescape lors des mises a jour (chemins Windows)",
     "v3.0 : Banque de 15 phrases droles apres chaque clip + 15 phrases pour la touche H",
-    "v2.9 : Touche [H] pour cacher completement la fenetre",
-    "v2.9 : Notification locale au demarrage",
+    "v2.9 : Touche [H] pour cacher la fenetre + notification au demarrage",
     "v2.8 : Correction definitive bad escape backslash (lambda re.sub)",
     "v2.6 : Notification locale apres chaque clip envoye",
 ]
@@ -187,16 +187,16 @@ def check_update():
             # ── Preservation des variables du client ──────────────────────
             import re as _re
             _webhook    = WEBHOOK_URL
-            _folder     = FOLDER.replace("\\", "\\\\")
+            _folder     = FOLDER
             _pseudo     = PSEUDO
-            _ffmpeg     = FFMPEG_PATH.replace("\\", "\\\\")
+            _ffmpeg     = FFMPEG_PATH
             _notif      = NOTIF_TYPE
             new_script = r.text
-            new_script = _re.sub(r'WEBHOOK_URL\s*=\s*"[^"]*"',  lambda m: f'WEBHOOK_URL  = "https://discord.com/api/webhooks/1499530486928904312/DvR9lA-bgAXE4omeyDYMP1VHreXcUjD50lhzlVvL5Xei2qmJiJkUDRqfQHV3FYAwD1e1"',  new_script)
-            new_script = _re.sub(r'FOLDER\s*=\s*r"[^"]*"',       lambda m: 'FOLDER       = r"F:\Medal\Clips"\\\\", "\\") + '"',  new_script)
-            new_script = _re.sub(r'PSEUDO\s*=\s*"[^"]*"',         lambda m: f'PSEUDO       = "Pablo_G"',   new_script)
-            new_script = _re.sub(r'FFMPEG_PATH\s*=\s*r"[^"]*"',   lambda m: 'FFMPEG_PATH  = r"C:\Users\j-phi\Desktop\Medal_to_Discord\ffmpeg\bin\ffmpeg.exe"\\\\", "\\") + '"',  new_script)
-            new_script = _re.sub(r'NOTIF_TYPE\s*=\s*"[^"]*"',     lambda m: f'NOTIF_TYPE   = "windows"',    new_script)
+            new_script = _re.sub(r'WEBHOOK_URL\s*=\s*"[^"]*"',  lambda m: 'WEBHOOK_URL  = "' + _webhook + '"',  new_script)
+            new_script = _re.sub(r'FOLDER\s*=\s*r"[^"]*"',       lambda m: 'FOLDER       = r"' + _folder  + '"',  new_script)
+            new_script = _re.sub(r'PSEUDO\s*=\s*"[^"]*"',         lambda m: 'PSEUDO       = "' + _pseudo  + '"',   new_script)
+            new_script = _re.sub(r'FFMPEG_PATH\s*=\s*r"[^"]*"',   lambda m: 'FFMPEG_PATH  = r"' + _ffmpeg  + '"',  new_script)
+            new_script = _re.sub(r'NOTIF_TYPE\s*=\s*"[^"]*"',     lambda m: 'NOTIF_TYPE   = "' + _notif   + '"',   new_script)
             # ─────────────────────────────────────────────────────────────
             with open(script_path, "w", encoding="utf-8") as f:
                 f.write(new_script)
@@ -979,38 +979,58 @@ def _print_shortcuts():
 
 
 def _hide_window():
-    """Cache complètement la fenêtre console (barre des tâches incluse)."""
+    """Minimise dans le system tray — icône cliquable pour restaurer."""
+    Thread(target=_run_tray, daemon=True).start()
+
+def _run_tray():
+    """Crée l'icône tray et cache la fenêtre console."""
     try:
+        import pystray
+        from PIL import Image, ImageDraw
+
+        # Cache la fenêtre console
         import ctypes
         hwnd = ctypes.windll.kernel32.GetConsoleWindow()
         if hwnd:
-            # Retire le bouton de la barre des tâches avant de cacher
-            GWL_EXSTYLE    = -20
-            WS_EX_APPWINDOW  = 0x00040000
-            WS_EX_TOOLWINDOW = 0x00000080
-            style = ctypes.windll.user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
-            style = (style & ~WS_EX_APPWINDOW) | WS_EX_TOOLWINDOW
-            ctypes.windll.user32.SetWindowLongW(hwnd, GWL_EXSTYLE, style)
-            ctypes.windll.user32.ShowWindow(hwnd, 0)  # SW_HIDE = 0
-        # Toast de confirmation
+            ctypes.windll.user32.ShowWindow(hwnd, 0)
+
+        # Crée une icône simple (carré violet)
+        img = Image.new("RGB", (64, 64), color=(83, 74, 183))
+        draw = ImageDraw.Draw(img)
+        draw.rectangle([8, 8, 56, 56], fill=(0, 200, 255))
+
+        def on_restore(icon, item):
+            icon.stop()
+            if hwnd:
+                ctypes.windll.user32.ShowWindow(hwnd, 9)  # SW_RESTORE
+
+        def on_quit(icon, item):
+            icon.stop()
+            os._exit(0)
+
         phrase = random.choice(PHRASES_HIDE)
-        ps_cmd = (
-            "Add-Type -AssemblyName System.Windows.Forms;"
-            "[System.Windows.Forms.Application]::EnableVisualStyles();"
-            "$n=New-Object System.Windows.Forms.NotifyIcon;"
-            "$n.Icon=[System.Drawing.SystemIcons]::Application;"
-            "$n.Visible=$true;"
-            f"$n.ShowBalloonTip(3000,'Medal → Discord  \U0001f47b','{phrase}',"
-            "[System.Windows.Forms.ToolTipIcon]::Info);"
-            "Start-Sleep -Milliseconds 3500;"
-            "$n.Dispose()"
+        menu = pystray.Menu(
+            pystray.MenuItem("Medal → Discord  ▶  actif", None, enabled=False),
+            pystray.MenuItem(f"« {phrase} »", None, enabled=False),
+            pystray.Menu.SEPARATOR,
+            pystray.MenuItem("Restaurer la fenêtre", on_restore),
+            pystray.MenuItem("Quitter", on_quit),
         )
-        subprocess.Popen(
-            ["powershell", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-Command", ps_cmd],
-            creationflags=subprocess.CREATE_NO_WINDOW
-        )
-    except Exception:
-        pass
+        icon = pystray.Icon("Medal→Discord", img, "Medal → Discord", menu)
+        log_write("INFO", "Fenetre cachee dans le tray.")
+        icon.run()
+
+    except ImportError:
+        # pystray pas installé — fallback simple hide
+        import ctypes
+        hwnd = ctypes.windll.kernel32.GetConsoleWindow()
+        if hwnd:
+            ctypes.windll.user32.ShowWindow(hwnd, 0)
+        ln_warn("pystray non installe — fenetre cachee sans icone tray.")
+    except Exception as e:
+        log_write("WARN", f"Tray echoue : {e}")
+
+
 
 def notify_startup():
     """Notification locale au démarrage selon NOTIF_TYPE."""
@@ -1136,7 +1156,7 @@ def config_menu():
             val = input().strip()
             if val:
                 PSEUDO = val
-                _save_variable("PSEUDO", f'PSEUDO       = "Pablo_G"', r'PSEUDO\s*=\s*"[^"]*"')
+                _save_variable("PSEUDO", f'PSEUDO       = "{PSEUDO}"', r'PSEUDO\s*=\s*"[^"]*"')
                 ln_ok(f"Pseudo mis à jour : {PSEUDO}")
         elif choix == "2":
             console.print(f"  Dossier actuel : [bold]{FOLDER}[/]  (Entrée pour garder)")
@@ -1147,7 +1167,7 @@ def config_menu():
                     ln_err(f"Dossier introuvable : {val}")
                 else:
                     FOLDER = val
-                    _save_variable("FOLDER", 'FOLDER       = r"F:\Medal\Clips"', r'FOLDER\s*=\s*r"[^"]*"')
+                    _save_variable("FOLDER", 'FOLDER       = r"' + FOLDER + '"', r'FOLDER\s*=\s*r"[^"]*"')
                     ln_ok(f"Dossier mis à jour : {FOLDER}")
         elif choix == "3":
             console.print("  Webhook actuel (Entrée pour garder) :")
@@ -1156,7 +1176,7 @@ def config_menu():
             val = input().strip()
             if val:
                 WEBHOOK_URL = val
-                _save_variable("WEBHOOK_URL", f'WEBHOOK_URL  = "https://discord.com/api/webhooks/1499530486928904312/DvR9lA-bgAXE4omeyDYMP1VHreXcUjD50lhzlVvL5Xei2qmJiJkUDRqfQHV3FYAwD1e1"', r'WEBHOOK_URL\s*=\s*"[^"]*"')
+                _save_variable("WEBHOOK_URL", f'WEBHOOK_URL  = "{WEBHOOK_URL}"', r'WEBHOOK_URL\s*=\s*"[^"]*"')
                 ln_ok("Webhook mis à jour.")
         elif choix == "4":
             _menu_notif()
@@ -1198,7 +1218,7 @@ def _menu_notif():
     mapping = {"1": "overlay", "2": "sound", "3": "windows"}
     if choix in mapping:
         NOTIF_TYPE = mapping[choix]
-        _save_variable("NOTIF_TYPE", f'NOTIF_TYPE   = "windows"', r'NOTIF_TYPE\s*=\s*"[^"]*"')
+        _save_variable("NOTIF_TYPE", f'NOTIF_TYPE   = "{NOTIF_TYPE}"', r'NOTIF_TYPE\s*=\s*"[^"]*"')
         ln_ok(f"Notification mise à jour : {NOTIF_TYPE}")
         # Test immédiat
         console.print("  [dim]Test de la notification...[/]")
