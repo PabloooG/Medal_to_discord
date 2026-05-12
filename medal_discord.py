@@ -99,7 +99,7 @@ CLIP_DUREE     = 20
 RETRY_UPLOAD   = 3
 
 # ── Auto-update depuis GitHub ─────────────────────────────────────────────────────
-VERSION     = "3.1"
+VERSION     = "3.2"
 PATCH_NOTES = [
     "v3.0 : Banque de phrases droles apres chaque clip envoye (15 phrases en rotation aleatoire)",
     "v2.9 : Touche [H] pour cacher completement la fenetre (script toujours actif en arriere-plan)",
@@ -984,6 +984,13 @@ def _hide_window():
         import ctypes
         hwnd = ctypes.windll.kernel32.GetConsoleWindow()
         if hwnd:
+            # Retire le bouton de la barre des tâches avant de cacher
+            GWL_EXSTYLE    = -20
+            WS_EX_APPWINDOW  = 0x00040000
+            WS_EX_TOOLWINDOW = 0x00000080
+            style = ctypes.windll.user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
+            style = (style & ~WS_EX_APPWINDOW) | WS_EX_TOOLWINDOW
+            ctypes.windll.user32.SetWindowLongW(hwnd, GWL_EXSTYLE, style)
             ctypes.windll.user32.ShowWindow(hwnd, 0)  # SW_HIDE = 0
         # Toast de confirmation
         phrase = random.choice(PHRASES_HIDE)
