@@ -99,8 +99,11 @@ CLIP_DUREE     = 20
 RETRY_UPLOAD   = 3
 
 # ── Auto-update depuis GitHub ─────────────────────────────────────────────────────
-VERSION     = "3.3"
+VERSION     = "3.4"
 PATCH_NOTES = [
+    "v3.4 : Fenetre visible au demarrage manuel, cachee seulement si lancement automatique",
+    "v3.4 : [H] cache la console immediatement puis affiche le tray",
+    "v3.4 : Anti-doublon tray — [H] ignore si tray deja actif",
     "v3.3 : Demarrage fantome total — aucun tray, aucune barre des taches. Tray uniquement sur [H]",
     "v3.3 : Correction unicodeescape dans check_update et config_menu (chemins Windows hardcodes)",
     "v3.3 : Auto-update reactivee (avait ete desactivee temporairement en v3.2)",
@@ -934,8 +937,9 @@ def main():
         console.print(active)
         _print_shortcuts()
 
-    # Démarrage fantôme : cache la console + retire de la barre des tâches, sans tray
-    _ghost_hide()
+    # Démarrage fantôme : cache uniquement si lancé en mode silencieux (démarrage auto)
+    if SILENT:
+        _ghost_hide()
 
     Thread(target=notify_startup, daemon=True).start()
 
@@ -1021,12 +1025,27 @@ def _ghost_hide():
     except Exception as e:
         log_write("WARN", f"Ghost hide echoue : {e}")
 
+_tray_running = False
+
 def _hide_window():
-    """[H] : apparition dans le tray avec icone cliquable pour restaurer."""
+    """[H] : cache la console et affiche le tray. Ignore si tray deja actif."""
+    global _tray_running
+    if _tray_running:
+        return
+    # Cache la console immediatement
+    try:
+        import ctypes as _ct
+        _hwnd = _ct.windll.kernel32.GetConsoleWindow()
+        if _hwnd:
+            _ct.windll.user32.ShowWindow(_hwnd, 0)
+    except Exception:
+        pass
     Thread(target=_run_tray, daemon=True).start()
 
 def _run_tray():
     """Affiche l'icone tray uniquement quand [H] est presse."""
+    global _tray_running
+    _tray_running = True
     try:
         import pystray
         from PIL import Image, ImageDraw
@@ -1041,6 +1060,8 @@ def _run_tray():
         draw.polygon([(22, 20), (22, 44), (46, 32)], fill=(12, 12, 24))
 
         def on_restore(icon, item):
+            global _tray_running
+            _tray_running = False
             icon.stop()
             if hwnd:
                 GWL_EXSTYLE      = -20
@@ -1053,6 +1074,8 @@ def _run_tray():
                 ctypes.windll.user32.SetForegroundWindow(hwnd)
 
         def on_quit(icon, item):
+            global _tray_running
+            _tray_running = False
             icon.stop()
             os._exit(0)
 
@@ -1069,8 +1092,10 @@ def _run_tray():
         icon.run()
 
     except ImportError:
+        _tray_running = False
         log_write("WARN", "pystray non installe — tray indisponible.")
     except Exception as e:
+        _tray_running = False
         log_write("WARN", f"Tray echoue : {e}")
 def notify_startup():
     """Notification locale au démarrage selon NOTIF_TYPE."""
