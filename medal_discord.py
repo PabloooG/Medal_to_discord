@@ -1044,15 +1044,17 @@ def _hide_window():
             SWP_NOSIZE       = 0x0001
             SWP_NOZORDER     = 0x0004
             SWP_FRAMECHANGED = 0x0020
+            # Etape 1 : cacher d'abord (fenetre visible = taskbar bloquee)
+            _ct.windll.user32.ShowWindow(_hwnd, 0)
+            # Etape 2 : changer le style quand la fenetre est cachee
             style = _ct.windll.user32.GetWindowLongW(_hwnd, GWL_EXSTYLE)
             style = (style | WS_EX_TOOLWINDOW) & ~WS_EX_APPWINDOW
             _ct.windll.user32.SetWindowLongW(_hwnd, GWL_EXSTYLE, style)
-            # Force Windows a relire le style -> retire l'entree de la barre des taches
+            # Etape 3 : flush pour que Windows retire l'entree de la taskbar
             _ct.windll.user32.SetWindowPos(
                 _hwnd, 0, 0, 0, 0, 0,
                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED
             )
-            _ct.windll.user32.ShowWindow(_hwnd, 0)
     except Exception:
         pass
     Thread(target=_run_tray, daemon=True).start()
