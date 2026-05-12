@@ -91,7 +91,7 @@ def _resolve_ffmpeg():
         FFPROBE_PATH = found.replace("ffmpeg.exe", "ffprobe.exe")
 
 PSEUDO       = "Pablo_G"
-NOTIF_TYPE   = "windows"   # "overlay" | "sound" | "windows"
+NOTIF_TYPE   = "windows"
 LIMIT_MB       = 10
 MARGE_SECURITE = 0.95
 AUDIO_KBPS     = 128
@@ -1032,11 +1032,17 @@ def _hide_window():
     global _tray_running
     if _tray_running:
         return
-    # Cache la console immediatement
+    # Cache la console ET retire de la barre des taches
     try:
         import ctypes as _ct
         _hwnd = _ct.windll.kernel32.GetConsoleWindow()
         if _hwnd:
+            GWL_EXSTYLE      = -20
+            WS_EX_TOOLWINDOW = 0x00000080
+            WS_EX_APPWINDOW  = 0x00040000
+            style = _ct.windll.user32.GetWindowLongW(_hwnd, GWL_EXSTYLE)
+            style = (style | WS_EX_TOOLWINDOW) & ~WS_EX_APPWINDOW
+            _ct.windll.user32.SetWindowLongW(_hwnd, GWL_EXSTYLE, style)
             _ct.windll.user32.ShowWindow(_hwnd, 0)
     except Exception:
         pass
@@ -1220,7 +1226,7 @@ def config_menu():
             console.print("  Nouveau pseudo : ", end="")
             val = input().strip()
             if val:
-                PSEUDO = val
+                PSEUDO       = "Pablo_G"
                 _save_variable("PSEUDO", f'PSEUDO       = "{PSEUDO}"', r'PSEUDO\s*=\s*"[^"]*"')
                 ln_ok(f"Pseudo mis à jour : {PSEUDO}")
         elif choix == "2":
@@ -1282,7 +1288,7 @@ def _menu_notif():
     choix = input().strip()
     mapping = {"1": "overlay", "2": "sound", "3": "windows"}
     if choix in mapping:
-        NOTIF_TYPE = mapping[choix]
+        NOTIF_TYPE   = "windows"
         _save_variable("NOTIF_TYPE", f'NOTIF_TYPE   = "{NOTIF_TYPE}"', r'NOTIF_TYPE\s*=\s*"[^"]*"')
         ln_ok(f"Notification mise à jour : {NOTIF_TYPE}")
         # Test immédiat
