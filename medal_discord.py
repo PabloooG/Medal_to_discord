@@ -1032,29 +1032,34 @@ def _hide_window():
     global _tray_running
     if _tray_running:
         return
-    # Cache la console ET retire de la barre des taches
+    # Approche PowerShell : plus fiable que ctypes pour retirer de la taskbar
+    # MainWindowHandle est mis a jour par PowerShell via le PID courant
     try:
-        import ctypes as _ct
-        _hwnd = _ct.windll.kernel32.GetConsoleWindow()
-        if _hwnd:
-            GWL_EXSTYLE      = -20
-            WS_EX_TOOLWINDOW = 0x00000080
-            WS_EX_APPWINDOW  = 0x00040000
-            SWP_NOMOVE       = 0x0002
-            SWP_NOSIZE       = 0x0001
-            SWP_NOZORDER     = 0x0004
-            SWP_FRAMECHANGED = 0x0020
-            # Etape 1 : cacher d'abord (fenetre visible = taskbar bloquee)
-            _ct.windll.user32.ShowWindow(_hwnd, 0)
-            # Etape 2 : changer le style quand la fenetre est cachee
-            style = _ct.windll.user32.GetWindowLongW(_hwnd, GWL_EXSTYLE)
-            style = (style | WS_EX_TOOLWINDOW) & ~WS_EX_APPWINDOW
-            _ct.windll.user32.SetWindowLongW(_hwnd, GWL_EXSTYLE, style)
-            # Etape 3 : flush pour que Windows retire l'entree de la taskbar
-            _ct.windll.user32.SetWindowPos(
-                _hwnd, 0, 0, 0, 0, 0,
-                SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED
-            )
+        pid = os.getpid()
+        cs_code = (
+            "using System; using System.Runtime.InteropServices; "
+            "public class W32 { "
+            "[DllImport(\"user32.dll\")] public static extern bool ShowWindow(IntPtr h,int n); "
+            "[DllImport(\"user32.dll\")] public static extern int GetWindowLong(IntPtr h,int i); "
+            "[DllImport(\"user32.dll\")] public static extern int SetWindowLong(IntPtr h,int i,int v); "
+            "[DllImport(\"user32.dll\")] public static extern bool SetWindowPos(IntPtr h,IntPtr a,int x,int y,int w,int z,uint f); "
+            "}"
+        )
+        ps_cmd = (
+            f"Add-Type -TypeDefinition '{cs_code}' -PassThru | Out-Null; "
+            f"$hw=(Get-Process -Id {pid}).MainWindowHandle; "
+            "if($hw -ne 0){"
+            "  [W32]::ShowWindow($hw,0);"
+            "  $s=[W32]::GetWindowLong($hw,-20);"
+            "  $s=($s -bor 0x80) -band (-bnot 0x40000);"
+            "  [W32]::SetWindowLong($hw,-20,$s);"
+            "  [W32]::SetWindowPos($hw,[IntPtr]::Zero,0,0,0,0,0x27);"
+            "}"
+        )
+        subprocess.Popen(
+            ["powershell", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-Command", ps_cmd],
+            creationflags=subprocess.CREATE_NO_WINDOW
+        )
     except Exception:
         pass
     Thread(target=_run_tray, daemon=True).start()
