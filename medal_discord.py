@@ -101,12 +101,12 @@ RETRY_UPLOAD   = 3
 # ── Auto-update depuis GitHub ─────────────────────────────────────────────────────
 VERSION     = "3.0"
 PATCH_NOTES = [
+    "v2.8 : Correction definitive bad escape backslash lors des mises a jour et du menu config (lambda re.sub)",
+    "v2.8 : Correction valeurs hardcodees dans le menu config (utilise maintenant les variables reelles)",
     "v2.6 : Notification locale apres chaque clip envoye (overlay, son systeme, toast Windows)",
     "v2.6 : NOTIF_TYPE preservee lors des mises a jour automatiques",
     "v2.5 : Correction preservation pseudo lors des mises a jour automatiques",
-    "v2.5 : Correction bad escape backslash dans les chemins Windows lors des mises a jour",
     "v2.4 : Preservation dynamique webhook/dossier/pseudo/ffmpeg via variables (plus de valeurs hardcodees)",
-    "v2.3 : Fichier log medal_discord.log avec rotation automatique (500 lignes)",
 ]
 GITHUB_RAW  = "https://raw.githubusercontent.com/PabloooG/Medal_to_discord/main/medal_discord.py"
 
@@ -186,14 +186,17 @@ def check_update():
         try:
             # ── Preservation des variables du client ──────────────────────
             import re as _re
-            _folder     = FOLDER.replace("\\", "\\\\")
-            _ffmpeg     = FFMPEG_PATH.replace("\\", "\\\\")
+            _webhook    = WEBHOOK_URL
+            _folder     = FOLDER
+            _pseudo     = PSEUDO
+            _ffmpeg     = FFMPEG_PATH
+            _notif      = NOTIF_TYPE
             new_script = r.text
-            new_script = _re.sub(r'WEBHOOK_URL\s*=\s*"[^"]*"', f'WEBHOOK_URL  = "https://discord.com/api/webhooks/1499530486928904312/DvR9lA-bgAXE4omeyDYMP1VHreXcUjD50lhzlVvL5Xei2qmJiJkUDRqfQHV3FYAwD1e1"', new_script)
-            new_script = _re.sub(r'FOLDER\s*=\s*r"[^"]*"',     f'FOLDER       = r"F:\Medal\Clips"',    new_script)
-            new_script = _re.sub(r'PSEUDO\s*=\s*"[^"]*"',       f'PSEUDO       = "Pablo_G"',      new_script)
-            new_script = _re.sub(r'FFMPEG_PATH\s*=\s*r"[^"]*"', f'FFMPEG_PATH  = r"C:\\Users\\j-phi\\Desktop\\Medal_to_Discord\\ffmpeg\\bin\ffmpeg.exe"',    new_script)
-            new_script = _re.sub(r'NOTIF_TYPE\s*=\s*"[^"]*"',   f'NOTIF_TYPE   = "windows"',  new_script)
+            new_script = _re.sub(r'WEBHOOK_URL\s*=\s*"[^"]*"',  lambda m: f'WEBHOOK_URL  = "{_webhook}"',  new_script)
+            new_script = _re.sub(r'FOLDER\s*=\s*r"[^"]*"',       lambda m: f'FOLDER       = r"{_folder}"',  new_script)
+            new_script = _re.sub(r'PSEUDO\s*=\s*"[^"]*"',         lambda m: f'PSEUDO       = "{_pseudo}"',   new_script)
+            new_script = _re.sub(r'FFMPEG_PATH\s*=\s*r"[^"]*"',   lambda m: f'FFMPEG_PATH  = r"{_ffmpeg}"',  new_script)
+            new_script = _re.sub(r'NOTIF_TYPE\s*=\s*"[^"]*"',     lambda m: f'NOTIF_TYPE   = "{_notif}"',    new_script)
             # ─────────────────────────────────────────────────────────────
             with open(script_path, "w", encoding="utf-8") as f:
                 f.write(new_script)
@@ -975,7 +978,7 @@ def config_menu():
             val = input().strip()
             if val:
                 PSEUDO = val
-                _save_variable("PSEUDO", f'PSEUDO       = "Pablo_G"', r'PSEUDO\s*=\s*"[^"]*"')
+                _save_variable("PSEUDO", f'PSEUDO       = "{PSEUDO}"', r'PSEUDO\s*=\s*"[^"]*"')
                 ln_ok(f"Pseudo mis à jour : {PSEUDO}")
         elif choix == "2":
             console.print(f"  Dossier actuel : [bold]{FOLDER}[/]  (Entrée pour garder)")
@@ -986,7 +989,7 @@ def config_menu():
                     ln_err(f"Dossier introuvable : {val}")
                 else:
                     FOLDER = val
-                    _save_variable("FOLDER", f'FOLDER       = r"F:\Medal\Clips"', r'FOLDER\s*=\s*r"[^"]*"')
+                    _save_variable("FOLDER", f'FOLDER       = r"{FOLDER}"', r'FOLDER\s*=\s*r"[^"]*"')
                     ln_ok(f"Dossier mis à jour : {FOLDER}")
         elif choix == "3":
             console.print("  Webhook actuel (Entrée pour garder) :")
@@ -995,7 +998,7 @@ def config_menu():
             val = input().strip()
             if val:
                 WEBHOOK_URL = val
-                _save_variable("WEBHOOK_URL", f'WEBHOOK_URL  = "https://discord.com/api/webhooks/1499530486928904312/DvR9lA-bgAXE4omeyDYMP1VHreXcUjD50lhzlVvL5Xei2qmJiJkUDRqfQHV3FYAwD1e1"', r'WEBHOOK_URL\s*=\s*"[^"]*"')
+                _save_variable("WEBHOOK_URL", f'WEBHOOK_URL  = "{WEBHOOK_URL}"', r'WEBHOOK_URL\s*=\s*"[^"]*"')
                 ln_ok("Webhook mis à jour.")
         elif choix == "4":
             _menu_notif()
@@ -1037,7 +1040,7 @@ def _menu_notif():
     mapping = {"1": "overlay", "2": "sound", "3": "windows"}
     if choix in mapping:
         NOTIF_TYPE = mapping[choix]
-        _save_variable("NOTIF_TYPE", f'NOTIF_TYPE   = "windows"', r'NOTIF_TYPE\s*=\s*"[^"]*"')
+        _save_variable("NOTIF_TYPE", f'NOTIF_TYPE   = "{NOTIF_TYPE}"', r'NOTIF_TYPE\s*=\s*"[^"]*"')
         ln_ok(f"Notification mise à jour : {NOTIF_TYPE}")
         # Test immédiat
         console.print("  [dim]Test de la notification...[/]")
@@ -1052,7 +1055,8 @@ def _save_variable(name: str, new_line: str, pattern: str):
         with open(script_path, "r", encoding="utf-8") as f:
             content = f.read()
         import re as _re
-        new_content = _re.sub(pattern, new_line, content)
+        _nl = new_line
+        new_content = _re.sub(pattern, lambda m: _nl, content)
         with open(script_path, "w", encoding="utf-8") as f:
             f.write(new_content)
         log_write("INFO", f"{name} sauvegarde dans le script.")
