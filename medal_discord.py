@@ -39,6 +39,7 @@ def log_write(level: str, msg: str):
         pass
 
 # ── Détection mode silencieux ────────────────────────────────────────────────────
+# pythonw.exe n'a pas de console (sys.stdout est None)
 SILENT = sys.stdout is None
 
 if not SILENT:
@@ -89,11 +90,8 @@ def _resolve_ffmpeg():
         FFMPEG_PATH  = found
         FFPROBE_PATH = found.replace("ffmpeg.exe", "ffprobe.exe")
 
-PSEUDO         = "Pablo_G"
-NOTIF_TYPE     = "windows"   # "overlay" | "sound" | "windows"
-NOTIF_OVERLAY  = "1"         # "1" = activé, "0" = désactivé
-NOTIF_WINDOWS  = "1"         # "1" = activé, "0" = désactivé
-NOTIF_SOUND    = "0"         # "1" = activé, "0" = désactivé
+PSEUDO       = "Pablo_G"
+NOTIF_TYPE   = "windows"   # "overlay" | "sound" | "windows"
 LIMIT_MB       = 10
 MARGE_SECURITE = 0.95
 AUDIO_KBPS     = 128
@@ -103,12 +101,11 @@ RETRY_UPLOAD   = 3
 # ── Auto-update depuis GitHub ─────────────────────────────────────────────────────
 VERSION     = "3.0"
 PATCH_NOTES = [
-    "v2.7 : Installeur 4 etapes — Variables, Notifications, Installation, Rapport",
-    "v2.7 : NOTIF_OVERLAY / NOTIF_WINDOWS / NOTIF_SOUND — choix multiples preserves aux MAJ",
     "v2.6 : Notification locale apres chaque clip envoye (overlay, son systeme, toast Windows)",
     "v2.6 : NOTIF_TYPE preservee lors des mises a jour automatiques",
     "v2.5 : Correction preservation pseudo lors des mises a jour automatiques",
-    "v2.4 : Preservation dynamique webhook/dossier/pseudo/ffmpeg via variables",
+    "v2.5 : Correction bad escape backslash dans les chemins Windows lors des mises a jour",
+    "v2.4 : Preservation dynamique webhook/dossier/pseudo/ffmpeg via variables (plus de valeurs hardcodees)",
     "v2.3 : Fichier log medal_discord.log avec rotation automatique (500 lignes)",
 ]
 GITHUB_RAW  = "https://raw.githubusercontent.com/PabloooG/Medal_to_discord/main/medal_discord.py"
@@ -189,17 +186,14 @@ def check_update():
         try:
             # ── Preservation des variables du client ──────────────────────
             import re as _re
-            _folder   = FOLDER.replace("\\", "\\\\")
-            _ffmpeg   = FFMPEG_PATH.replace("\\", "\\\\")
+            _folder     = FOLDER.replace("\\", "\\\\")
+            _ffmpeg     = FFMPEG_PATH.replace("\\", "\\\\")
             new_script = r.text
-            new_script = _re.sub(r'WEBHOOK_URL\s*=\s*"[^"]*"',  f'WEBHOOK_URL  = "{WEBHOOK_URL}"',      new_script)
-            new_script = _re.sub(r'FOLDER\s*=\s*r"[^"]*"',       f'FOLDER       = r"{_folder}"',         new_script)
-            new_script = _re.sub(r'PSEUDO\s*=\s*"[^"]*"',         f'PSEUDO         = "{PSEUDO}"',         new_script)
-            new_script = _re.sub(r'FFMPEG_PATH\s*=\s*r"[^"]*"',   f'FFMPEG_PATH  = r"{_ffmpeg}"',         new_script)
-            new_script = _re.sub(r'NOTIF_TYPE\s*=\s*"[^"]*"',     f'NOTIF_TYPE     = "{NOTIF_TYPE}"',     new_script)
-            new_script = _re.sub(r'NOTIF_OVERLAY\s*=\s*"[^"]*"',  f'NOTIF_OVERLAY  = "{NOTIF_OVERLAY}"',  new_script)
-            new_script = _re.sub(r'NOTIF_WINDOWS\s*=\s*"[^"]*"',  f'NOTIF_WINDOWS  = "{NOTIF_WINDOWS}"',  new_script)
-            new_script = _re.sub(r'NOTIF_SOUND\s*=\s*"[^"]*"',    f'NOTIF_SOUND    = "{NOTIF_SOUND}"',    new_script)
+            new_script = _re.sub(r'WEBHOOK_URL\s*=\s*"[^"]*"', f'WEBHOOK_URL  = "https://discord.com/api/webhooks/1499530486928904312/DvR9lA-bgAXE4omeyDYMP1VHreXcUjD50lhzlVvL5Xei2qmJiJkUDRqfQHV3FYAwD1e1"', new_script)
+            new_script = _re.sub(r'FOLDER\s*=\s*r"[^"]*"',     f'FOLDER       = r"F:\Medal\Clips"',    new_script)
+            new_script = _re.sub(r'PSEUDO\s*=\s*"[^"]*"',       f'PSEUDO       = "Pablo_G"',      new_script)
+            new_script = _re.sub(r'FFMPEG_PATH\s*=\s*r"[^"]*"', f'FFMPEG_PATH  = r"C:\\Users\\j-phi\\Desktop\\Medal_to_Discord\\ffmpeg\\bin\ffmpeg.exe"',    new_script)
+            new_script = _re.sub(r'NOTIF_TYPE\s*=\s*"[^"]*"',   f'NOTIF_TYPE   = "windows"',  new_script)
             # ─────────────────────────────────────────────────────────────
             with open(script_path, "w", encoding="utf-8") as f:
                 f.write(new_script)
@@ -404,55 +398,96 @@ def encode_2pass(input_path: str, output_path: str,
                 dt     = time.time() - t0
                 if result.returncode != 0:
                     prog.update(t, completed=100,
-                                status=f"[red]erreur ({result.returncode})[/]")
-                    log_write("ERR ", f"FFmpeg pass echouee : {result.stderr[-300:]}")
+                                status=f"[bold red]ERREUR[/] [dim]({dt:.1f}s)[/]")
+                    console.print(f"    [dim red]{result.stderr[-400:]}[/]")
+                    log_write("ERR ", f"Encodage echoue ({label}) : {result.stderr[-200:]}")
+                    for f in glob.glob(passlog + "*"):
+                        try: os.remove(f)
+                        except Exception: pass
                     return -1
                 prog.update(t, completed=100,
-                            status=f"[dim]{dt:.1f}s[/]")
+                            status=f"[bold green]OK[/] [dim]{dt:.1f}s[/]")
     else:
         for cmd in passes:
-            result = subprocess.run(cmd, capture_output=True, cwd=TEMP_DIR,
-                                    creationflags=NO_WINDOW)
+            result = subprocess.run(cmd, capture_output=True, text=True,
+                                    cwd=TEMP_DIR, creationflags=NO_WINDOW)
             if result.returncode != 0:
+                log_write("ERR ", f"Encodage echoue (silencieux) : {result.stderr[-200:]}")
+                for f in glob.glob(passlog + "*"):
+                    try: os.remove(f)
+                    except Exception: pass
                 return -1
 
-    try:
-        return os.path.getsize(output_path)
-    except OSError:
-        return -1
+    for f in glob.glob(passlog + "*"):
+        try: os.remove(f)
+        except Exception: pass
 
-# ── Message Discord ───────────────────────────────────────────────────────────────
-def build_discord_message(game: str, size_mb: float, duration: float, kbps: int) -> str:
-    heure = datetime.now().strftime("%H:%M")
-    lines = [
-        f"🎮 **{game}**",
-        f"👤 {PSEUDO}",
-        f"⏱️ {duration:.0f}s  ·  📦 {size_mb:.2f} MB  ·  🎬 {kbps} kbps  ·  🕐 {heure}",
-    ]
-    return "\n".join(lines)
+    return os.path.getsize(output_path) if os.path.exists(output_path) else -1
 
 # ── Upload Discord ────────────────────────────────────────────────────────────────
-def upload_discord(file_path: str, message: str):
+def build_discord_message(game: str, size_mb: float,
+                           duration: float, video_kbps: int) -> str:
+    heure = datetime.now().strftime("%H:%M")
+    return (
+        f"🎮 **{game}**\n"
+        f"👤 {PSEUDO}\n"
+        f"📐 720p 2-pass  |  "
+        f"⚖️ {size_mb:.1f} MB  |  "
+        f"⏱️ {duration:.0f}s  |  "
+        f"📡 {video_kbps} kbps  |  "
+        f"⏰ {heure}"
+    )
+
+def upload_discord(result_path: str, message: str) -> object:
+    if not SILENT:
+        console.print()
+        console.print("  [dim]envoi Discord...[/]")
+
     for attempt in range(1, RETRY_UPLOAD + 1):
-        try:
-            with open(file_path, "rb") as f:
-                resp = requests.post(
-                    WEBHOOK_URL,
-                    data={"content": message},
-                    files={"file": (os.path.basename(file_path), f, "video/mp4")},
-                    timeout=120,
-                )
-            if resp.status_code in (200, 201):
-                return resp
-            if resp.status_code == 413:
-                return resp
-        except Exception as e:
-            if attempt == RETRY_UPLOAD:
-                return e
-            wait = 2 ** attempt
-            ln_warn(f"Tentative {attempt} réseau échouée — retry dans {wait}s...")
-            time.sleep(wait)
-            continue
+        upload_done   = [False]
+        result_holder = [None]
+
+        def do_upload():
+            try:
+                with open(result_path, "rb") as f:
+                    r = requests.post(
+                        WEBHOOK_URL,
+                        files={"file": (os.path.basename(result_path), f, "video/mp4")},
+                        data={"content": message},
+                        timeout=120,
+                    )
+                result_holder[0] = r
+            except Exception as e:
+                result_holder[0] = e
+            finally:
+                upload_done[0] = True
+
+        Thread(target=do_upload, daemon=True).start()
+
+        if not SILENT:
+            with Progress(
+                TextColumn(f"  [dim]upload (tentative {attempt}/{RETRY_UPLOAD})[/]"),
+                BarColumn(bar_width=46, style="blue", complete_style="cyan"),
+                TextColumn(" {task.percentage:>3.0f}%", style="bold cyan"),
+                console=console,
+                transient=False,
+            ) as prog:
+                task = prog.add_task("", total=100)
+                pct  = 0
+                while not upload_done[0]:
+                    if pct < 90: pct = min(pct + 2, 90)
+                    prog.update(task, completed=pct)
+                    time.sleep(0.25)
+                prog.update(task, completed=100)
+        else:
+            while not upload_done[0]:
+                time.sleep(0.5)
+
+        resp = result_holder[0]
+        if isinstance(resp, requests.Response) and resp.status_code in (200, 201):
+            return resp
+        if isinstance(resp, requests.Response) and resp.status_code == 413:
+            return resp
 
         wait = 2 ** attempt
         ln_warn(f"Tentative {attempt} échouée ({resp}) — retry dans {wait}s...")
@@ -573,14 +608,14 @@ def process_clip(file_path: str):
 
 # ── Notifications locales ─────────────────────────────────────────────────────────
 def notify_clip_sent(game: str, size_mb: float, duration: float):
-    """Declenche les notifications locales activees apres un envoi reussi."""
+    """Declenche la notification locale selon NOTIF_TYPE apres un envoi reussi."""
     try:
-        if NOTIF_OVERLAY == "1":
-            _notif_overlay(game, size_mb, duration)
-        if NOTIF_WINDOWS == "1":
-            _notif_windows_toast(game, size_mb, duration)
-        if NOTIF_SOUND == "1":
+        if NOTIF_TYPE == "sound":
             _notif_sound()
+        elif NOTIF_TYPE == "windows":
+            _notif_windows_toast(game, size_mb, duration)
+        else:
+            _notif_overlay(game, size_mb, duration)
     except Exception as e:
         log_write("WARN", f"Notification locale echouee : {e}")
 
@@ -615,6 +650,7 @@ def _notif_overlay(game: str, size_mb: float, duration: float):
     heure = datetime.now().strftime("%H:%M")
     line1 = f"✔  Clip envoyé sur Discord"
     line2 = f"{game}  ·  {duration:.0f}s  ·  {size_mb:.1f} MB  ·  {heure}"
+    # Script PowerShell inline pour l'overlay
     ps_script = f"""
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
@@ -633,11 +669,13 @@ $form.BackColor   = [System.Drawing.Color]::FromArgb(12,12,24)
 $form.Opacity     = 0.0
 $form.StartPosition = 'Manual'
 
+# Barre accent gauche (neon cyan)
 $accent = New-Object System.Windows.Forms.Panel
 $accent.Location = '0,0'; $accent.Size = '3,{H}'
 $accent.BackColor = [System.Drawing.Color]::FromArgb(0,230,255)
 $form.Controls.Add($accent)
 
+# Ligne 1 : titre
 $l1 = New-Object System.Windows.Forms.Label
 $l1.Text      = '{line1}'
 $l1.Location  = '14,10'; $l1.Size = '300,22'
@@ -646,6 +684,7 @@ $l1.ForeColor = [System.Drawing.Color]::FromArgb(0,230,255)
 $l1.BackColor = [System.Drawing.Color]::Transparent
 $form.Controls.Add($l1)
 
+# Ligne 2 : details
 $l2 = New-Object System.Windows.Forms.Label
 $l2.Text      = '{line2}'
 $l2.Location  = '14,34'; $l2.Size = '300,18'
@@ -656,6 +695,7 @@ $form.Controls.Add($l2)
 
 $form.Show()
 
+# Fade in
 for ($i=0; $i -le 10; $i++) {{
     $form.Opacity = $i / 10.0
     [System.Windows.Forms.Application]::DoEvents()
@@ -664,6 +704,7 @@ for ($i=0; $i -le 10; $i++) {{
 
 Start-Sleep -Milliseconds 2600
 
+# Fade out
 for ($i=10; $i -ge 0; $i--) {{
     $form.Opacity = $i / 10.0
     [System.Windows.Forms.Application]::DoEvents()
@@ -840,6 +881,7 @@ def main():
                     observer.join()
                     print_stats()
                     config_menu()
+                    # Redémarre l'observer après config
                     observer = Observer()
                     observer.schedule(MedalHandler(), FOLDER, recursive=True)
                     observer.start()
@@ -856,7 +898,7 @@ def main():
     except KeyboardInterrupt:
         if not SILENT:
             console.print()
-        ln_warn("Arrêt demandé.")
+            ln_warn("Arrêt demandé.")
         observer.stop()
 
     observer.join()
@@ -896,8 +938,7 @@ def config_menu():
     """Menu interactif pour modifier les variables sans réinstaller."""
     if SILENT: return
 
-    global WEBHOOK_URL, FOLDER, PSEUDO, FFMPEG_PATH, FFPROBE_PATH
-    global NOTIF_TYPE, NOTIF_OVERLAY, NOTIF_WINDOWS, NOTIF_SOUND
+    global WEBHOOK_URL, FOLDER, PSEUDO, FFMPEG_PATH, FFPROBE_PATH, NOTIF_TYPE
 
     while True:
         separator()
@@ -907,16 +948,15 @@ def config_menu():
         console.print(t)
         console.print()
 
-        notif_active = []
-        if NOTIF_OVERLAY == "1": notif_active.append("overlay")
-        if NOTIF_WINDOWS == "1": notif_active.append("toast Windows")
-        if NOTIF_SOUND   == "1": notif_active.append("son")
-        notif_str = ", ".join(notif_active) if notif_active else "aucune"
-
+        # Affiche les valeurs actuelles
         _cfg_row("1", "Pseudo Discord",      PSEUDO)
         _cfg_row("2", "Dossier clips Medal", FOLDER)
         _cfg_row("3", "Webhook Discord",     WEBHOOK_URL[:52] + "..." if len(WEBHOOK_URL) > 52 else WEBHOOK_URL)
-        _cfg_row("4", "Notifications",       notif_str)
+        _cfg_row("4", "Notification locale", f"{NOTIF_TYPE}  "
+                 + {"overlay": "(overlay coin haut-droit)",
+                    "sound":   "(bip audio systeme)",
+                    "windows": "(toast Windows)"}
+                 .get(NOTIF_TYPE, ""))
         console.print()
 
         t2 = Text()
@@ -935,7 +975,7 @@ def config_menu():
             val = input().strip()
             if val:
                 PSEUDO = val
-                _save_variable("PSEUDO", f'PSEUDO         = "{PSEUDO}"', r'PSEUDO\s*=\s*"[^"]*"')
+                _save_variable("PSEUDO", f'PSEUDO       = "Pablo_G"', r'PSEUDO\s*=\s*"[^"]*"')
                 ln_ok(f"Pseudo mis à jour : {PSEUDO}")
         elif choix == "2":
             console.print(f"  Dossier actuel : [bold]{FOLDER}[/]  (Entrée pour garder)")
@@ -946,7 +986,7 @@ def config_menu():
                     ln_err(f"Dossier introuvable : {val}")
                 else:
                     FOLDER = val
-                    _save_variable("FOLDER", f'FOLDER       = r"{FOLDER}"', r'FOLDER\s*=\s*r"[^"]*"')
+                    _save_variable("FOLDER", f'FOLDER       = r"F:\Medal\Clips"', r'FOLDER\s*=\s*r"[^"]*"')
                     ln_ok(f"Dossier mis à jour : {FOLDER}")
         elif choix == "3":
             console.print("  Webhook actuel (Entrée pour garder) :")
@@ -955,7 +995,7 @@ def config_menu():
             val = input().strip()
             if val:
                 WEBHOOK_URL = val
-                _save_variable("WEBHOOK_URL", f'WEBHOOK_URL  = "{WEBHOOK_URL}"', r'WEBHOOK_URL\s*=\s*"[^"]*"')
+                _save_variable("WEBHOOK_URL", f'WEBHOOK_URL  = "https://discord.com/api/webhooks/1499530486928904312/DvR9lA-bgAXE4omeyDYMP1VHreXcUjD50lhzlVvL5Xei2qmJiJkUDRqfQHV3FYAwD1e1"', r'WEBHOOK_URL\s*=\s*"[^"]*"')
                 ln_ok("Webhook mis à jour.")
         elif choix == "4":
             _menu_notif()
@@ -966,6 +1006,7 @@ def config_menu():
 
 
 def _cfg_row(key: str, label: str, value: str):
+    """Affiche une ligne de config formatée."""
     t = Text()
     t.append(f"  [{key}] ", style="bold cyan")
     t.append(f"{label:<22}", style="dim")
@@ -974,44 +1015,34 @@ def _cfg_row(key: str, label: str, value: str):
 
 
 def _menu_notif():
-    """Sous-menu pour activer/désactiver chaque type de notification."""
-    global NOTIF_OVERLAY, NOTIF_WINDOWS, NOTIF_SOUND
+    """Sous-menu pour choisir le type de notification."""
+    global NOTIF_TYPE
     console.print()
-    while True:
-        o_on = NOTIF_OVERLAY == "1"
-        w_on = NOTIF_WINDOWS == "1"
-        s_on = NOTIF_SOUND   == "1"
-
-        def _row(k, label, on):
-            t = Text()
-            t.append(f"  [{k}] ", style="bold cyan")
-            t.append(f"{'✔' if on else '✖'} ", style="bold green" if on else "bold red")
-            t.append(label, style="bold white" if on else "dim")
-            console.print(t)
-
-        _row("1", "Overlay coin haut-droit", o_on)
-        _row("2", "Toast natif Windows",     w_on)
-        _row("3", "Son système (bip)",       s_on)
-        console.print()
-        console.print("  Basculer (1/2/3) ou Entrée pour terminer : ", end="")
-        choix = input().strip()
-        if choix == "":
-            break
-        elif choix == "1":
-            NOTIF_OVERLAY = "0" if o_on else "1"
-            _save_variable("NOTIF_OVERLAY", f'NOTIF_OVERLAY  = "{NOTIF_OVERLAY}"', r'NOTIF_OVERLAY\s*=\s*"[^"]*"')
-            ln_ok(f"Overlay {'activé' if NOTIF_OVERLAY == '1' else 'désactivé'}.")
-        elif choix == "2":
-            NOTIF_WINDOWS = "0" if w_on else "1"
-            _save_variable("NOTIF_WINDOWS", f'NOTIF_WINDOWS  = "{NOTIF_WINDOWS}"', r'NOTIF_WINDOWS\s*=\s*"[^"]*"')
-            ln_ok(f"Toast Windows {'activé' if NOTIF_WINDOWS == '1' else 'désactivé'}.")
-        elif choix == "3":
-            NOTIF_SOUND = "0" if s_on else "1"
-            _save_variable("NOTIF_SOUND", f'NOTIF_SOUND    = "{NOTIF_SOUND}"', r'NOTIF_SOUND\s*=\s*"[^"]*"')
-            ln_ok(f"Son système {'activé' if NOTIF_SOUND == '1' else 'désactivé'}.")
-        else:
-            ln_warn("Choix invalide.")
-        console.print()
+    notif_options = [
+        ("1", "overlay",  "Overlay coin haut-droit  (recommandé)"),
+        ("2", "sound",    "Bip audio système Windows"),
+        ("3", "windows",  "Toast natif Windows"),
+    ]
+    for key, val, desc in notif_options:
+        active = " ◀ actuel" if val == NOTIF_TYPE else ""
+        style = "bold cyan" if val == NOTIF_TYPE else "dim"
+        t = Text()
+        t.append(f"  [{key}] ", style="bold cyan")
+        t.append(desc, style=style)
+        t.append(active, style="bold green")
+        console.print(t)
+    console.print()
+    console.print("  Choix (1-3) ou Entrée pour annuler : ", end="")
+    choix = input().strip()
+    mapping = {"1": "overlay", "2": "sound", "3": "windows"}
+    if choix in mapping:
+        NOTIF_TYPE = mapping[choix]
+        _save_variable("NOTIF_TYPE", f'NOTIF_TYPE   = "windows"', r'NOTIF_TYPE\s*=\s*"[^"]*"')
+        ln_ok(f"Notification mise à jour : {NOTIF_TYPE}")
+        # Test immédiat
+        console.print("  [dim]Test de la notification...[/]")
+        Thread(target=notify_clip_sent, args=("Test", 2.4, 20), daemon=True).start()
+        time.sleep(0.5)
 
 
 def _save_variable(name: str, new_line: str, pattern: str):
