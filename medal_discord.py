@@ -99,7 +99,7 @@ CLIP_DUREE     = 20
 RETRY_UPLOAD   = 3
 
 # ── Auto-update depuis GitHub ─────────────────────────────────────────────────────
-VERSION     = "3.0"
+VERSION     = "3.1"
 PATCH_NOTES = [
     "v3.0 : Banque de phrases droles apres chaque clip envoye (15 phrases en rotation aleatoire)",
     "v2.9 : Touche [H] pour cacher completement la fenetre (script toujours actif en arriere-plan)",
