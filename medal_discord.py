@@ -195,11 +195,31 @@ def check_update():
             _ffmpeg     = FFMPEG_PATH
             _notif      = NOTIF_TYPE
             new_script = r.text
-            new_script = _re.sub(r'WEBHOOK_URL\s*=\s*"[^"]*"',  lambda m, v=_webhook:  f'WEBHOOK_URL  = "{v}"',  new_script)
-            new_script = _re.sub(r'FOLDER\s*=\s*r"[^"]*"',       lambda m, v=_folder:   f'FOLDER       = r"{v}"', new_script)
-            new_script = _re.sub(r'PSEUDO\s*=\s*"[^"]*"',         lambda m, v=_pseudo:   f'PSEUDO       = "{v}"', new_script)
-            new_script = _re.sub(r'FFMPEG_PATH\s*=\s*r"[^"]*"',   lambda m, v=_ffmpeg:   f'FFMPEG_PATH  = r"{v}"', new_script)
-            new_script = _re.sub(r'NOTIF_TYPE\s*=\s*"[^"]*"',     lambda m, v=_notif:    f'NOTIF_TYPE   = "{v}"', new_script)
+            # Substitution des variables utilisateur - remplacement ligne par ligne
+            # pour eviter tout conflit regex sur le code source lui-meme
+            _q = chr(34)
+            _lines_out = []
+            for _ln in new_script.splitlines(keepends=True):
+                _s = _ln.lstrip()
+                if _s.startswith("WEBHOOK" + "_URL") and "=" in _s and not _ln.startswith(" "):
+                    _lines_out.append("WEBHOOK_URL  = " + _q + _webhook + _q + chr(10))
+                elif _s.startswith("FOLDER") and "=" in _s and not _s.startswith("FOLDER"):
+                    _lines_out.append(_ln)
+                elif _s.startswith("FOL" + "DER") and "=" in _s and "r" + _q in _s:
+                    _indent = _ln[: len(_ln) - len(_ln.lstrip())]
+                    _lines_out.append(_indent + "FOLDER       = r" + _q + _folder + _q + chr(10))
+                elif _s.startswith("PS" + "EUDO") and "=" in _s:
+                    _indent = _ln[: len(_ln) - len(_ln.lstrip())]
+                    _lines_out.append(_indent + "PSEUDO       = " + _q + _pseudo + _q + chr(10))
+                elif _s.startswith("FFMPEG" + "_PATH") and "=" in _s and "r" + _q in _s:
+                    _indent = _ln[: len(_ln) - len(_ln.lstrip())]
+                    _lines_out.append(_indent + "FFMPEG_PATH  = r" + _q + _ffmpeg + _q + chr(10))
+                elif _s.startswith("NOTIF" + "_TYPE") and "=" in _s:
+                    _indent = _ln[: len(_ln) - len(_ln.lstrip())]
+                    _lines_out.append(_indent + "NOTIF_TYPE   = " + _q + _notif + _q + chr(10))
+                else:
+                    _lines_out.append(_ln)
+            new_script = "".join(_lines_out)
             # ─────────────────────────────────────────────────────────────
             with open(script_path, "w", encoding="utf-8") as f:
                 f.write(new_script)
@@ -1187,7 +1207,7 @@ def config_menu():
                     ln_err(f"Dossier introuvable : {val}")
                 else:
                     FOLDER = val
-                    _save_variable("FOLDER", f'FOLDER       = r"{FOLDER}"', r'FOLDER\s*=\s*r"[^"]*"')
+                    _save_variable("FOLDER", 'FOLDER       = r"' + FOLDER + '"', r'FOLDER\s*=\s*r"[^"]*"')
                     ln_ok(f"Dossier mis à jour : {FOLDER}")
         elif choix == "3":
             console.print("  Webhook actuel (Entrée pour garder) :")
