@@ -66,7 +66,7 @@ def separator():
 # ── CONFIGURATION ────────────────────────────────────────────────────────────────
 WEBHOOK_URL  = "https://discord.com/api/webhooks/1499530486928904312/DvR9lA-bgAXE4omeyDYMP1VHreXcUjD50lhzlVvL5Xei2qmJiJkUDRqfQHV3FYAwD1e1"
 FOLDER       = r"F:\Medal\Clips"
-FFMPEG_PATH  = r"C:\\Users\\j-phi\\Desktop\\Medal_to_Discord\\ffmpeg\\bin\ffmpeg.exe"
+FFMPEG_PATH  = r"C:\Users\j-phi\Desktop\Medal_to_Discord\ffmpeg\bin\ffmpeg.exe"
 FFPROBE_PATH = FFMPEG_PATH.replace("ffmpeg.exe", "ffprobe.exe")
 
 # ── Détection automatique FFmpeg si chemin configuré introuvable ─────────────────
@@ -99,14 +99,14 @@ CLIP_DUREE     = 20
 RETRY_UPLOAD   = 3
 
 # ── Auto-update depuis GitHub ─────────────────────────────────────────────────────
-VERSION     = "3.0"
+VERSION     = "3.4"
 PATCH_NOTES = [
-    "v3.0 : Banque de phrases droles apres chaque clip envoye (15 phrases en rotation aleatoire)",
-    "v2.9 : Touche [H] pour cacher completement la fenetre (script toujours actif en arriere-plan)",
+    "v3.1 : Correction SyntaxError unicodeescape lors des mises a jour (chemins Windows avec backslash)",
+    "v3.0 : Banque de 15 phrases droles apres chaque clip + 15 phrases pour la touche H",
+    "v2.9 : Touche [H] pour cacher completement la fenetre",
     "v2.9 : Notification locale au demarrage",
-    "v2.8 : Correction definitive bad escape backslash lors des mises a jour et du menu config",
-    "v2.6 : Notification locale apres chaque clip envoye (overlay, son systeme, toast Windows)",
-    "v2.4 : Preservation dynamique webhook/dossier/pseudo/ffmpeg via variables",
+    "v2.8 : Correction definitive bad escape backslash (lambda re.sub)",
+    "v2.6 : Notification locale apres chaque clip envoye",
 ]
 GITHUB_RAW  = "https://raw.githubusercontent.com/PabloooG/Medal_to_discord/main/medal_discord.py"
 
@@ -187,15 +187,15 @@ def check_update():
             # ── Preservation des variables du client ──────────────────────
             import re as _re
             _webhook    = WEBHOOK_URL
-            _folder     = FOLDER
+            _folder     = FOLDER.replace("\\", "\\\\")
             _pseudo     = PSEUDO
-            _ffmpeg     = FFMPEG_PATH
+            _ffmpeg     = FFMPEG_PATH.replace("\\", "\\\\")
             _notif      = NOTIF_TYPE
             new_script = r.text
             new_script = _re.sub(r'WEBHOOK_URL\s*=\s*"[^"]*"',  lambda m: f'WEBHOOK_URL  = "{_webhook}"',  new_script)
-            new_script = _re.sub(r'FOLDER\s*=\s*r"[^"]*"',       lambda m: f'FOLDER       = r"{_folder}"',  new_script)
+            new_script = _re.sub(r'FOLDER\s*=\s*r"[^"]*"',       lambda m: 'FOLDER       = r"' + _folder.replace("\\\\", "\\") + '"',  new_script)
             new_script = _re.sub(r'PSEUDO\s*=\s*"[^"]*"',         lambda m: f'PSEUDO       = "{_pseudo}"',   new_script)
-            new_script = _re.sub(r'FFMPEG_PATH\s*=\s*r"[^"]*"',   lambda m: f'FFMPEG_PATH  = r"{_ffmpeg}"',  new_script)
+            new_script = _re.sub(r'FFMPEG_PATH\s*=\s*r"[^"]*"',   lambda m: 'FFMPEG_PATH  = r"' + _ffmpeg.replace("\\\\", "\\") + '"',  new_script)
             new_script = _re.sub(r'NOTIF_TYPE\s*=\s*"[^"]*"',     lambda m: f'NOTIF_TYPE   = "{_notif}"',    new_script)
             # ─────────────────────────────────────────────────────────────
             with open(script_path, "w", encoding="utf-8") as f:
@@ -1147,7 +1147,7 @@ def config_menu():
                     ln_err(f"Dossier introuvable : {val}")
                 else:
                     FOLDER = val
-                    _save_variable("FOLDER", f'FOLDER       = r"{FOLDER}"', r'FOLDER\s*=\s*r"[^"]*"')
+                    _save_variable("FOLDER", 'FOLDER       = r"' + FOLDER + '"', r'FOLDER\s*=\s*r"[^"]*"')
                     ln_ok(f"Dossier mis à jour : {FOLDER}")
         elif choix == "3":
             console.print("  Webhook actuel (Entrée pour garder) :")
