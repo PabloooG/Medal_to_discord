@@ -99,7 +99,7 @@ CLIP_DUREE     = 20
 RETRY_UPLOAD   = 3
 
 # ── Auto-update depuis GitHub ─────────────────────────────────────────────────────
-VERSION     = "3.4"
+VERSION     = "3.1"
 PATCH_NOTES = [
     "v3.1 : Correction SyntaxError unicodeescape lors des mises a jour (chemins Windows avec backslash)",
     "v3.0 : Banque de 15 phrases droles apres chaque clip + 15 phrases pour la touche H",
