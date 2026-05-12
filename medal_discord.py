@@ -99,8 +99,11 @@ CLIP_DUREE     = 20
 RETRY_UPLOAD   = 3
 
 # ── Auto-update depuis GitHub ─────────────────────────────────────────────────────
-VERSION     = "3.2"
+VERSION     = "3.3"
 PATCH_NOTES = [
+    "v3.3 : Demarrage fantome total — aucun tray, aucune barre des taches. Tray uniquement sur [H]",
+    "v3.3 : Correction unicodeescape dans check_update et config_menu (chemins Windows hardcodes)",
+    "v3.3 : Auto-update reactivee (avait ete desactivee temporairement en v3.2)",
     "v3.2 : Touche [H] minimise dans le system tray avec icone (clic droit pour restaurer ou quitter)",
     "v3.1 : Correction SyntaxError unicodeescape lors des mises a jour (chemins Windows)",
     "v3.0 : Banque de 15 phrases droles apres chaque clip + 15 phrases pour la touche H",
@@ -911,6 +914,9 @@ def main():
         console.print(active)
         _print_shortcuts()
 
+    # Démarrage fantôme : cache la console + retire de la barre des tâches, sans tray
+    _ghost_hide()
+
     Thread(target=notify_startup, daemon=True).start()
 
     try:
@@ -978,31 +984,53 @@ def _print_shortcuts():
     console.print()
 
 
-def _hide_window():
-    """Minimise dans le system tray — icône cliquable pour restaurer."""
-    Thread(target=_run_tray, daemon=True).start()
-
-def _run_tray():
-    """Crée l'icône tray et cache la fenêtre console."""
+def _ghost_hide():
+    """Demarrage fantome : cache console + retire barre des taches. Aucun tray."""
     try:
-        import pystray
-        from PIL import Image, ImageDraw
-
-        # Cache la fenêtre console
         import ctypes
         hwnd = ctypes.windll.kernel32.GetConsoleWindow()
         if hwnd:
+            GWL_EXSTYLE      = -20
+            WS_EX_TOOLWINDOW = 0x00000080
+            WS_EX_APPWINDOW  = 0x00040000
+            style = ctypes.windll.user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
+            style = (style | WS_EX_TOOLWINDOW) & ~WS_EX_APPWINDOW
+            ctypes.windll.user32.SetWindowLongW(hwnd, GWL_EXSTYLE, style)
             ctypes.windll.user32.ShowWindow(hwnd, 0)
+        log_write("INFO", "Mode fantome actif (pas de tray, pas de barre des taches).")
+    except Exception as e:
+        log_write("WARN", f"Ghost hide echoue : {e}")
 
-        # Crée une icône simple (carré violet)
-        img = Image.new("RGB", (64, 64), color=(83, 74, 183))
+def _hide_window():
+    """[H] : apparition dans le tray avec icone cliquable pour restaurer."""
+    Thread(target=_run_tray, daemon=True).start()
+
+def _run_tray():
+    """Affiche l'icone tray uniquement quand [H] est presse."""
+    try:
+        import pystray
+        from PIL import Image, ImageDraw
+        import ctypes
+
+        hwnd = ctypes.windll.kernel32.GetConsoleWindow()
+
+        # Icone cyan avec triangle play
+        img = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
         draw = ImageDraw.Draw(img)
-        draw.rectangle([8, 8, 56, 56], fill=(0, 200, 255))
+        draw.ellipse([4, 4, 60, 60], fill=(0, 200, 255))
+        draw.polygon([(22, 20), (22, 44), (46, 32)], fill=(12, 12, 24))
 
         def on_restore(icon, item):
             icon.stop()
             if hwnd:
-                ctypes.windll.user32.ShowWindow(hwnd, 9)  # SW_RESTORE
+                GWL_EXSTYLE      = -20
+                WS_EX_TOOLWINDOW = 0x00000080
+                WS_EX_APPWINDOW  = 0x00040000
+                style = ctypes.windll.user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
+                style = (style & ~WS_EX_TOOLWINDOW) | WS_EX_APPWINDOW
+                ctypes.windll.user32.SetWindowLongW(hwnd, GWL_EXSTYLE, style)
+                ctypes.windll.user32.ShowWindow(hwnd, 9)
+                ctypes.windll.user32.SetForegroundWindow(hwnd)
 
         def on_quit(icon, item):
             icon.stop()
@@ -1010,28 +1038,20 @@ def _run_tray():
 
         phrase = random.choice(PHRASES_HIDE)
         menu = pystray.Menu(
-            pystray.MenuItem("Medal → Discord  ▶  actif", None, enabled=False),
-            pystray.MenuItem(f"« {phrase} »", None, enabled=False),
+            pystray.MenuItem("Medal -> Discord  actif", None, enabled=False),
+            pystray.MenuItem(f"<< {phrase} >>", None, enabled=False),
             pystray.Menu.SEPARATOR,
-            pystray.MenuItem("Restaurer la fenêtre", on_restore),
+            pystray.MenuItem("Restaurer la fenetre  [H]", on_restore),
             pystray.MenuItem("Quitter", on_quit),
         )
-        icon = pystray.Icon("Medal→Discord", img, "Medal → Discord", menu)
-        log_write("INFO", "Fenetre cachee dans le tray.")
+        icon = pystray.Icon("Medal->Discord", img, "Medal -> Discord", menu)
+        log_write("INFO", "Icone tray affichee (appui [H]).")
         icon.run()
 
     except ImportError:
-        # pystray pas installé — fallback simple hide
-        import ctypes
-        hwnd = ctypes.windll.kernel32.GetConsoleWindow()
-        if hwnd:
-            ctypes.windll.user32.ShowWindow(hwnd, 0)
-        ln_warn("pystray non installe — fenetre cachee sans icone tray.")
+        log_write("WARN", "pystray non installe — tray indisponible.")
     except Exception as e:
         log_write("WARN", f"Tray echoue : {e}")
-
-
-
 def notify_startup():
     """Notification locale au démarrage selon NOTIF_TYPE."""
     try:
