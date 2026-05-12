@@ -99,7 +99,7 @@ CLIP_DUREE     = 20
 RETRY_UPLOAD   = 3
 
 # ── Auto-update depuis GitHub ─────────────────────────────────────────────────────
-VERSION     = "3.2"
+VERSION     = "3.5"
 PATCH_NOTES = [
     "v3.2 : Touche [H] minimise dans le system tray avec icone (clic droit pour restaurer ou quitter)",
     "v3.1 : Correction SyntaxError unicodeescape lors des mises a jour (chemins Windows)",
