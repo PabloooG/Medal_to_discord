@@ -99,7 +99,7 @@ CLIP_DUREE     = 20
 RETRY_UPLOAD   = 3
 
 # ── Auto-update depuis GitHub ─────────────────────────────────────────────────────
-VERSION     = "3.5"
+VERSION     = "3.2"
 PATCH_NOTES = [
     "v3.2 : Touche [H] minimise dans le system tray avec icone (clic droit pour restaurer ou quitter)",
     "v3.1 : Correction SyntaxError unicodeescape lors des mises a jour (chemins Windows)",
@@ -844,7 +844,8 @@ def main():
     create_uninstaller()
     if FFMPEG_PATH != ffmpeg_original:
         ln_warn(f"FFmpeg reconfiguré automatiquement : {FFMPEG_PATH}")
-    check_update()
+    # check_update()  # Desactive temporairement — mettre a jour GitHub d'abord
+    ln_ok(f"Version {VERSION} — mises a jour automatiques desactivees temporairement.")
 
     flag_path = os.path.abspath(__file__) + ".updated"
     if os.path.exists(flag_path):
