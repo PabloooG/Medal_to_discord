@@ -844,8 +844,7 @@ def main():
     create_uninstaller()
     if FFMPEG_PATH != ffmpeg_original:
         ln_warn(f"FFmpeg reconfiguré automatiquement : {FFMPEG_PATH}")
-    # check_update()  # Desactive temporairement — mettre a jour GitHub d'abord
-    ln_ok(f"Version {VERSION} — mises a jour automatiques desactivees temporairement.")
+    check_update()
 
     flag_path = os.path.abspath(__file__) + ".updated"
     if os.path.exists(flag_path):
