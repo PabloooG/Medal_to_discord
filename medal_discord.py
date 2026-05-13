@@ -1034,21 +1034,32 @@ def _hide_window():
         return
     try:
         import ctypes as _ct
-        # GetConsoleWindow() est le seul moyen fiable d'avoir le HWND de la console
-        _hwnd = _ct.windll.kernel32.GetConsoleWindow()
+        import uuid
+
+        GWL_EXSTYLE      = -20
+        WS_EX_TOOLWINDOW = 0x00000080
+        WS_EX_APPWINDOW  = 0x00040000
+        SWP_NOMOVE       = 0x0002
+        SWP_NOSIZE       = 0x0001
+        SWP_NOZORDER     = 0x0004
+        SWP_FRAMECHANGED = 0x0020
+
+        # Renommer la fenetre avec un titre unique pour FindWindow fiable
+        titre_unique = "MedalDiscord_" + uuid.uuid4().hex[:8]
+        _ct.windll.kernel32.SetConsoleTitleW(titre_unique)
+        import time as _time; _time.sleep(0.05)  # laisser Windows mettre a jour
+
+        _hwnd = _ct.windll.user32.FindWindowW(None, titre_unique)
+        if not _hwnd:
+            # fallback GetConsoleWindow
+            _hwnd = _ct.windll.kernel32.GetConsoleWindow()
+
         if _hwnd:
-            GWL_EXSTYLE      = -20
-            WS_EX_TOOLWINDOW = 0x00000080
-            WS_EX_APPWINDOW  = 0x00040000
-            SWP_NOMOVE       = 0x0002
-            SWP_NOSIZE       = 0x0001
-            SWP_NOZORDER     = 0x0004
-            SWP_FRAMECHANGED = 0x0020
-            # 1) Retirer de la taskbar AVANT de cacher
+            # 1) Changer style (fenetre encore visible)
             style = _ct.windll.user32.GetWindowLongW(_hwnd, GWL_EXSTYLE)
             style = (style | WS_EX_TOOLWINDOW) & ~WS_EX_APPWINDOW
             _ct.windll.user32.SetWindowLongW(_hwnd, GWL_EXSTYLE, style)
-            # 2) Flush du style (force taskbar a relire)
+            # 2) Flush — force la taskbar a relire le style
             _ct.windll.user32.SetWindowPos(
                 _hwnd, 0, 0, 0, 0, 0,
                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED
