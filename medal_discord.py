@@ -1079,7 +1079,18 @@ def _run_tray():
         from PIL import Image, ImageDraw
         import ctypes
 
+        # Retrouver le HWND via le titre unique qui a ete defini dans _hide_window
+        # (GetConsoleWindow peut pointer vers le mauvais HWND sous Windows Terminal)
         hwnd = ctypes.windll.kernel32.GetConsoleWindow()
+        # Chercher aussi via EnumWindows pour valider qu'on a le bon
+        # On recupere le titre actuel de la console pour FindWindow
+        buf = ctypes.create_unicode_buffer(256)
+        ctypes.windll.kernel32.GetConsoleTitleW(buf, 256)
+        titre_actuel = buf.value
+        if titre_actuel:
+            found = ctypes.windll.user32.FindWindowW(None, titre_actuel)
+            if found:
+                hwnd = found
 
         # Icone cyan avec triangle play
         img = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
@@ -1095,9 +1106,20 @@ def _run_tray():
                 GWL_EXSTYLE      = -20
                 WS_EX_TOOLWINDOW = 0x00000080
                 WS_EX_APPWINDOW  = 0x00040000
+                SWP_NOMOVE       = 0x0002
+                SWP_NOSIZE       = 0x0001
+                SWP_NOZORDER     = 0x0004
+                SWP_FRAMECHANGED = 0x0020
+                # 1) Remettre le style normal (visible dans taskbar)
                 style = ctypes.windll.user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
                 style = (style & ~WS_EX_TOOLWINDOW) | WS_EX_APPWINDOW
                 ctypes.windll.user32.SetWindowLongW(hwnd, GWL_EXSTYLE, style)
+                # 2) Flush du style
+                ctypes.windll.user32.SetWindowPos(
+                    hwnd, 0, 0, 0, 0, 0,
+                    SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED
+                )
+                # 3) Restaurer et mettre au premier plan
                 ctypes.windll.user32.ShowWindow(hwnd, 9)
                 ctypes.windll.user32.SetForegroundWindow(hwnd)
 
