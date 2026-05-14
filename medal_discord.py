@@ -99,7 +99,7 @@ CLIP_DUREE     = 20
 RETRY_UPLOAD   = 3
 
 # ── Auto-update depuis GitHub ─────────────────────────────────────────────────────
-VERSION     = "3.5"
+VERSION     = "3.4"
 PATCH_NOTES = [
     "v3.4 : Fenetre visible au demarrage manuel, cachee seulement si lancement automatique",
     "v3.4 : [H] cache la console immediatement puis affiche le tray",
@@ -205,21 +205,21 @@ def check_update():
             for _ln in new_script.splitlines(keepends=True):
                 _s = _ln.lstrip()
                 if _s.startswith("WEBHOOK" + "_URL") and "=" in _s and not _ln.startswith(" "):
-                    _lines_out.append("WEBHOOK_URL  = " + _q + _webhook + _q + chr(10))
+                    _lines_out.append("WEBHOOK" + "_URL  = " + _q + _webhook + _q + chr(10))
                 elif _s.startswith("FOLDER") and "=" in _s and not _s.startswith("FOLDER"):
                     _lines_out.append(_ln)
                 elif _s.startswith("FOL" + "DER") and "=" in _s and "r" + _q in _s:
                     _indent = _ln[: len(_ln) - len(_ln.lstrip())]
-                    _lines_out.append(_indent + "FOLDER       = r" + _q + _folder + _q + chr(10))
+                    _lines_out.append(_indent + "FOL" + "DER       = r" + _q + _folder + _q + chr(10))
                 elif _s.startswith("PS" + "EUDO") and "=" in _s:
                     _indent = _ln[: len(_ln) - len(_ln.lstrip())]
-                    _lines_out.append(_indent + "PSEUDO       = " + _q + _pseudo + _q + chr(10))
+                    _lines_out.append(_indent + "PS" + "EUDO       = " + _q + _pseudo + _q + chr(10))
                 elif _s.startswith("FFMPEG" + "_PATH") and "=" in _s and "r" + _q in _s:
                     _indent = _ln[: len(_ln) - len(_ln.lstrip())]
-                    _lines_out.append(_indent + "FFMPEG_PATH  = r" + _q + _ffmpeg + _q + chr(10))
+                    _lines_out.append(_indent + "FFMPEG" + "_PATH  = r" + _q + _ffmpeg + _q + chr(10))
                 elif _s.startswith("NOTIF" + "_TYPE") and "=" in _s:
                     _indent = _ln[: len(_ln) - len(_ln.lstrip())]
-                    _lines_out.append(_indent + "NOTIF_TYPE   = " + _q + _notif + _q + chr(10))
+                    _lines_out.append(_indent + "NOTIF" + "_TYPE   = " + _q + _notif + _q + chr(10))
             # ─────────────────────────────────────────────────────────────
             with open(script_path, "w", encoding="utf-8") as f:
                 f.write("".join(_lines_out))
