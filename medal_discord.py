@@ -99,7 +99,7 @@ CLIP_DUREE     = 20
 RETRY_UPLOAD   = 3
 
 # ── Auto-update depuis GitHub ─────────────────────────────────────────────────────
-VERSION     = "3.5"
+VERSION     = "3.6"
 PATCH_NOTES = [
     "v3.5 : Demarrage direct en tray — plus de double fenetre possible",
     "v3.5 : Fix NOTIF_TYPE toujours sauvegarde comme windows dans le menu config",
@@ -206,8 +206,6 @@ def check_update():
                 _s = _ln.lstrip()
                 if _s.startswith("WEBHOOK" + "_URL") and "=" in _s and not _ln.startswith(" "):
                     _lines_out.append("WEBHOOK_URL  = " + _q + _webhook + _q + chr(10))
-                elif _s.startswith("FOLDER") and "=" in _s and not _s.startswith("FOLDER"):
-                    _lines_out.append(_ln)
                 elif _s.startswith("FOL" + "DER") and "=" in _s and "r" + _q in _s:
                     _indent = _ln[: len(_ln) - len(_ln.lstrip())]
                     _lines_out.append(_indent + "FOLDER       = r" + _q + _folder + _q + chr(10))
@@ -221,8 +219,9 @@ def check_update():
                     _indent = _ln[: len(_ln) - len(_ln.lstrip())]
                     _lines_out.append(_indent + "NOTIF_TYPE   = " + _q + _notif + _q + chr(10))
             # ─────────────────────────────────────────────────────────────
+            final_script = "".join(_lines_out) if _lines_out else new_script
             with open(script_path, "w", encoding="utf-8") as f:
-                f.write(new_script)
+                f.write(final_script)
             ln_ok(f"Mise a jour v{latest} telechargee !")
             flag_path = script_path + ".updated"
             with open(flag_path, "w", encoding="utf-8") as _f:
@@ -1090,6 +1089,13 @@ def _run_tray():
             global _tray_running
             _tray_running = False
             icon.stop()
+            if not SILENT:
+                separator()
+                active_txt = Text()
+                active_txt.append("▶ ", style="bold green")
+                active_txt.append("Surveillance active — nouveaux clips seulement...", style="bold green")
+                console.print(active_txt)
+                _print_shortcuts()
             if hwnd:
                 GWL_EXSTYLE      = -20
                 WS_EX_TOOLWINDOW = 0x00000080
