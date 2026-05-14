@@ -99,20 +99,20 @@ CLIP_DUREE     = 20
 RETRY_UPLOAD   = 3
 
 # ── Auto-update depuis GitHub ─────────────────────────────────────────────────────
-VERSION     = "3.4"
+VERSION     = "3.5"
 PATCH_NOTES = [
+    "v3.5 : Demarrage direct en tray — plus de double fenetre possible",
+    "v3.5 : Fix NOTIF_TYPE toujours sauvegarde comme windows dans le menu config",
+    "v3.5 : Fix PSEUDO toujours sauvegarde comme Pablo_G peu importe la valeur saisie",
+    "v3.5 : Fix SyntaxError lors du changement de mode de notification",
     "v3.4 : Fenetre visible au demarrage manuel, cachee seulement si lancement automatique",
     "v3.4 : [H] cache la console immediatement puis affiche le tray",
     "v3.4 : Anti-doublon tray — [H] ignore si tray deja actif",
     "v3.3 : Demarrage fantome total — aucun tray, aucune barre des taches. Tray uniquement sur [H]",
     "v3.3 : Correction unicodeescape dans check_update et config_menu (chemins Windows hardcodes)",
-    "v3.3 : Auto-update reactivee (avait ete desactivee temporairement en v3.2)",
     "v3.2 : Touche [H] minimise dans le system tray avec icone (clic droit pour restaurer ou quitter)",
     "v3.1 : Correction SyntaxError unicodeescape lors des mises a jour (chemins Windows)",
     "v3.0 : Banque de 15 phrases droles apres chaque clip + 15 phrases pour la touche H",
-    "v2.9 : Touche [H] pour cacher la fenetre + notification au demarrage",
-    "v2.8 : Correction definitive bad escape backslash (lambda re.sub)",
-    "v2.6 : Notification locale apres chaque clip envoye",
 ]
 GITHUB_RAW  = "https://raw.githubusercontent.com/PabloooG/Medal_to_discord/main/medal_discord.py"
 
@@ -220,9 +220,6 @@ def check_update():
                 elif _s.startswith("NOTIF" + "_TYPE") and "=" in _s:
                     _indent = _ln[: len(_ln) - len(_ln.lstrip())]
                     _lines_out.append(_indent + "NOTIF_TYPE   = " + _q + _notif + _q + chr(10))
-                else:
-                    _lines_out.append(_ln)
-            new_script = "".join(_lines_out)
             # ─────────────────────────────────────────────────────────────
             with open(script_path, "w", encoding="utf-8") as f:
                 f.write(new_script)
@@ -930,18 +927,9 @@ def main():
     observer.schedule(MedalHandler(), FOLDER, recursive=True)
     observer.start()
 
-    if not SILENT:
-        active = Text()
-        active.append("▶ ", style="bold green")
-        active.append("Surveillance active — nouveaux clips seulement...", style="bold green")
-        console.print(active)
-        _print_shortcuts()
-
-    # Démarrage fantôme : cache uniquement si lancé en mode silencieux (démarrage auto)
-    if SILENT:
-        _ghost_hide()
-
+    # Démarrage toujours en tray — évite toute double fenetre
     Thread(target=notify_startup, daemon=True).start()
+    _hide_window()
 
     try:
         while True:
@@ -1270,7 +1258,7 @@ def config_menu():
             console.print("  Nouveau pseudo : ", end="")
             val = input().strip()
             if val:
-                PSEUDO       = "Pablo_G"
+                PSEUDO       = val
                 _save_variable("PSEUDO", f'PSEUDO       = "{PSEUDO}"', r'PSEUDO\s*=\s*"[^"]*"')
                 ln_ok(f"Pseudo mis à jour : {PSEUDO}")
         elif choix == "2":
@@ -1332,7 +1320,7 @@ def _menu_notif():
     choix = input().strip()
     mapping = {"1": "overlay", "2": "sound", "3": "windows"}
     if choix in mapping:
-        NOTIF_TYPE   = "windows"
+        NOTIF_TYPE   = mapping[choix]
         _save_variable("NOTIF_TYPE", f'NOTIF_TYPE   = "{NOTIF_TYPE}"', r'NOTIF_TYPE\s*=\s*"[^"]*"')
         ln_ok(f"Notification mise à jour : {NOTIF_TYPE}")
         # Test immédiat
