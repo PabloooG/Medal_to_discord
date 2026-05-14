@@ -99,8 +99,9 @@ CLIP_DUREE     = 20
 RETRY_UPLOAD   = 3
 
 # ── Auto-update depuis GitHub ─────────────────────────────────────────────────────
-VERSION     = "3.9"
+VERSION     = "3.10"
 PATCH_NOTES = [
+    "v3.10 : Restauration tray ne wipe plus la console — infos de demarrage preservees",
     "v3.9 : Fix critique mise a jour — script complet preserve (plus d'IndentationError)",
     "v3.8 : Wipe console apres config/tray mais garde l'affichage complet au demarrage",
     "v3.7 : Console effacee automatiquement apres config ou restauration tray",
@@ -1121,7 +1122,6 @@ def _run_tray():
                 # 3) Restaurer et mettre au premier plan
                 ctypes.windll.user32.ShowWindow(hwnd, 9)
                 ctypes.windll.user32.SetForegroundWindow(hwnd)
-            _clear_and_redraw()
 
         def on_quit(icon, item):
             global _tray_running
