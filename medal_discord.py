@@ -99,8 +99,9 @@ CLIP_DUREE     = 20
 RETRY_UPLOAD   = 3
 
 # ── Auto-update depuis GitHub ─────────────────────────────────────────────────────
-VERSION     = "3.9"
+VERSION     = "4.0"
 PATCH_NOTES = [
+    "v4.0 : Correction overlay/notif — le choix dans le menu etait ignore",
     "v3.8 : Correction critique — auto-update generait un fichier vide (1 Ko) apres MAJ",
     "v3.5 : Correction auto-update qui corrompait le script a chaque mise a jour",
     "v3.5 : Correction NOTIF_TYPE toujours force a windows peu importe le choix",
@@ -1279,7 +1280,7 @@ def config_menu():
             val = input().strip()
             if val:
                 PSEUDO       = val
-                _save_variable("PSEUDO", f'PSEUDO       = "{PSEUDO}"', r'PSEUDO\s*=\s*"[^"]*"')
+                _save_variable("PSEUDO", f'PSEUDO       = "{PSEUDO}"', r'^PSEUDO\s*=\s*"[^"]*"')
                 ln_ok(f"Pseudo mis à jour : {PSEUDO}")
         elif choix == "2":
             console.print(f"  Dossier actuel : [bold]{FOLDER}[/]  (Entrée pour garder)")
@@ -1290,7 +1291,7 @@ def config_menu():
                     ln_err(f"Dossier introuvable : {val}")
                 else:
                     FOLDER = val
-                    _save_variable("FOLDER", 'FOLDER       = r"' + FOLDER + '"', r'FOLDER\s*=\s*r"[^"]*"')
+                    _save_variable("FOLDER", 'FOLDER       = r"' + FOLDER + '"', r'^FOLDER\s*=\s*r"[^"]*"')
                     ln_ok(f"Dossier mis à jour : {FOLDER}")
         elif choix == "3":
             console.print("  Webhook actuel (Entrée pour garder) :")
@@ -1299,7 +1300,7 @@ def config_menu():
             val = input().strip()
             if val:
                 WEBHOOK_URL = val
-                _save_variable("WEBHOOK_URL", f'WEBHOOK_URL  = "{WEBHOOK_URL}"', r'WEBHOOK_URL\s*=\s*"[^"]*"')
+                _save_variable("WEBHOOK_URL", f'WEBHOOK_URL  = "{WEBHOOK_URL}"', r'^WEBHOOK_URL\s*=\s*"[^"]*"')
                 ln_ok("Webhook mis à jour.")
         elif choix == "4":
             _menu_notif()
@@ -1341,7 +1342,7 @@ def _menu_notif():
     mapping = {"1": "overlay", "2": "sound", "3": "windows"}
     if choix in mapping:
         NOTIF_TYPE   = mapping[choix]
-        _save_variable("NOTIF_TYPE", f'NOTIF_TYPE   = "{NOTIF_TYPE}"', r'NOTIF_TYPE\s*=\s*"[^"]*"')
+        _save_variable("NOTIF_TYPE", f'NOTIF_TYPE   = "{NOTIF_TYPE}"', r'^NOTIF_TYPE\s*=\s*"[^"]*"')
         ln_ok(f"Notification mise à jour : {NOTIF_TYPE}")
         # Test immédiat
         console.print("  [dim]Test de la notification...[/]")
@@ -1357,7 +1358,7 @@ def _save_variable(name: str, new_line: str, pattern: str):
             content = f.read()
         import re as _re
         _nl = new_line
-        new_content = _re.sub(pattern, lambda m: _nl, content)
+        new_content = _re.sub(pattern, lambda m: _nl, content, flags=_re.MULTILINE)
         with open(script_path, "w", encoding="utf-8") as f:
             f.write(new_content)
         log_write("INFO", f"{name} sauvegarde dans le script.")
