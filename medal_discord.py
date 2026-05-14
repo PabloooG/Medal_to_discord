@@ -222,7 +222,7 @@ def check_update():
                     _lines_out.append(_indent + "NOTIF_TYPE   = " + _q + _notif + _q + chr(10))
             # ─────────────────────────────────────────────────────────────
             with open(script_path, "w", encoding="utf-8") as f:
-                f.write(new_script)
+                f.write("".join(_lines_out))
             ln_ok(f"Mise a jour v{latest} telechargee !")
             flag_path = script_path + ".updated"
             with open(flag_path, "w", encoding="utf-8") as _f:
@@ -1267,7 +1267,7 @@ def config_menu():
             console.print("  Nouveau pseudo : ", end="")
             val = input().strip()
             if val:
-                PSEUDO       = "Pablo_G"
+                PSEUDO       = val
                 _save_variable("PSEUDO", f'PSEUDO       = "{PSEUDO}"', r'PSEUDO\s*=\s*"[^"]*"')
                 ln_ok(f"Pseudo mis à jour : {PSEUDO}")
         elif choix == "2":
@@ -1329,8 +1329,8 @@ def _menu_notif():
     choix = input().strip()
     mapping = {"1": "overlay", "2": "sound", "3": "windows"}
     if choix in mapping:
-        NOTIF_TYPE   = "windows"
-        _save_variable("NOTIF_TYPE", f'NOTIF_TYPE   = "windows"', r'NOTIF_TYPE\s*=\s*"[^"]*"')
+        NOTIF_TYPE   = mapping[choix]
+        _save_variable("NOTIF_TYPE", f'NOTIF_TYPE   = "{NOTIF_TYPE}"', r'NOTIF_TYPE\s*=\s*"[^"]*"')
         ln_ok(f"Notification mise à jour : {NOTIF_TYPE}")
         # Test immédiat
         console.print("  [dim]Test de la notification...[/]")
