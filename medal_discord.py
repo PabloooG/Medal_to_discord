@@ -99,8 +99,9 @@ CLIP_DUREE     = 20
 RETRY_UPLOAD   = 3
 
 # ── Auto-update depuis GitHub ─────────────────────────────────────────────────────
-VERSION     = "3.7"
+VERSION     = "3.8"
 PATCH_NOTES = [
+    "v3.8 : Correction critique — auto-update generait un fichier vide (1 Ko) apres MAJ",
     "v3.5 : Correction auto-update qui corrompait le script a chaque mise a jour",
     "v3.5 : Correction NOTIF_TYPE toujours force a windows peu importe le choix",
     "v3.5 : Correction PSEUDO toujours force a Pablo_G peu importe ce qui etait tape",
@@ -228,6 +229,8 @@ def check_update():
                 elif _s.startswith("NOTIF" + "_TYPE") and "=" in _s:
                     _indent = _ln[: len(_ln) - len(_ln.lstrip())]
                     _lines_out.append(_indent + "NOTIF" + "_TYPE   = " + _q + _notif + _q + chr(10))
+                else:
+                    _lines_out.append(_ln)
             # ─────────────────────────────────────────────────────────────
             with open(script_path, "w", encoding="utf-8") as f:
                 f.write("".join(_lines_out))
