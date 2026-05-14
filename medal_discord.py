@@ -99,7 +99,7 @@ CLIP_DUREE     = 20
 RETRY_UPLOAD   = 3
 
 # ── Auto-update depuis GitHub ─────────────────────────────────────────────────────
-VERSION     = "3.6"
+VERSION     = "3.7"
 PATCH_NOTES = [
     "v3.5 : Correction auto-update qui corrompait le script a chaque mise a jour",
     "v3.5 : Correction NOTIF_TYPE toujours force a windows peu importe le choix",
