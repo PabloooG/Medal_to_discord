@@ -219,7 +219,7 @@ def check_update():
                     _lines_out.append(_indent + "FFMPEG_PATH  = r" + _q + _ffmpeg + _q + chr(10))
                 elif _s.startswith("NOTIF" + "_TYPE") and "=" in _s:
                     _indent = _ln[: len(_ln) - len(_ln.lstrip())]
-                    _lines_out.append(_indent + "NOTIF_TYPE   = "windows"".join(_lines_out)
+                    _lines_out.append(_indent + "NOTIF_TYPE   = " + _q + _notif + _q + chr(10))
             # ─────────────────────────────────────────────────────────────
             with open(script_path, "w", encoding="utf-8") as f:
                 f.write(new_script)
