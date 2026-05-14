@@ -99,8 +99,9 @@ CLIP_DUREE     = 20
 RETRY_UPLOAD   = 3
 
 # ── Auto-update depuis GitHub ─────────────────────────────────────────────────────
-VERSION     = "3.13"
+VERSION     = "3.14"
 PATCH_NOTES = [
+    "v3.14 : Fix warning SyntaxWarning regex FOLDER — zero avertissement au demarrage",
     "v3.13 : Fix sauvegarde variables config — regex ancre en debut de ligne uniquement",
     "v3.12 : Menu config wipe la console a chaque affichage — plus d'historique",
     "v3.11 : Raccourcis C/H/Q affiches au demarrage avant passage en tray",
@@ -1289,7 +1290,7 @@ def config_menu():
                     ln_err(f"Dossier introuvable : {val}")
                 else:
                     FOLDER = val
-                    _save_variable("FOLDER", 'FOLDER       = r"' + FOLDER + '"', r'^FOLDER\s*=\s*r"[^"]*"')
+                    _save_variable("FOLDER", 'FOLDER       = r"' + FOLDER + '"', '^FOLDER\\s*=\\s*r"[^"]*"')
                     ln_ok(f"Dossier mis à jour : {FOLDER}")
         elif choix == "3":
             console.print("  Webhook actuel (Entrée pour garder) :")
