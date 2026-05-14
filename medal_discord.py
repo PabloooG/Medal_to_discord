@@ -99,7 +99,7 @@ CLIP_DUREE     = 20
 RETRY_UPLOAD   = 3
 
 # ── Auto-update depuis GitHub ─────────────────────────────────────────────────────
-VERSION     = "3.8"
+VERSION     = "3.9"
 PATCH_NOTES = [
     "v3.8 : Correction critique — auto-update generait un fichier vide (1 Ko) apres MAJ",
     "v3.5 : Correction auto-update qui corrompait le script a chaque mise a jour",
