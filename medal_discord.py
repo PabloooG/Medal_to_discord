@@ -99,8 +99,10 @@ CLIP_DUREE     = 20
 RETRY_UPLOAD   = 3
 
 # ── Auto-update depuis GitHub ─────────────────────────────────────────────────────
-VERSION     = "3.11"
+VERSION     = "3.13"
 PATCH_NOTES = [
+    "v3.13 : Fix sauvegarde variables config — regex ancre en debut de ligne uniquement",
+    "v3.12 : Menu config wipe la console a chaque affichage — plus d'historique",
     "v3.11 : Raccourcis C/H/Q affiches au demarrage avant passage en tray",
     "v3.10 : Restauration tray ne wipe plus la console — infos de demarrage preservees",
     "v3.9 : Fix critique mise a jour — script complet preserve (plus d'IndentationError)",
@@ -1276,7 +1278,7 @@ def config_menu():
             val = input().strip()
             if val:
                 PSEUDO       = val
-                _save_variable("PSEUDO", f'PSEUDO       = "{PSEUDO}"', r'PSEUDO\s*=\s*"[^"]*"')
+                _save_variable("PSEUDO", f'PSEUDO       = "{PSEUDO}"', r'^PSEUDO\s*=\s*"[^"]*"')
                 ln_ok(f"Pseudo mis à jour : {PSEUDO}")
         elif choix == "2":
             console.print(f"  Dossier actuel : [bold]{FOLDER}[/]  (Entrée pour garder)")
@@ -1287,7 +1289,7 @@ def config_menu():
                     ln_err(f"Dossier introuvable : {val}")
                 else:
                     FOLDER = val
-                    _save_variable("FOLDER", 'FOLDER       = r"' + FOLDER + '"', r'FOLDER\s*=\s*r"[^"]*"')
+                    _save_variable("FOLDER", 'FOLDER       = r"' + FOLDER + '"', r'^FOLDER\s*=\s*r"[^"]*"')
                     ln_ok(f"Dossier mis à jour : {FOLDER}")
         elif choix == "3":
             console.print("  Webhook actuel (Entrée pour garder) :")
@@ -1296,7 +1298,7 @@ def config_menu():
             val = input().strip()
             if val:
                 WEBHOOK_URL = val
-                _save_variable("WEBHOOK_URL", f'WEBHOOK_URL  = "{WEBHOOK_URL}"', r'WEBHOOK_URL\s*=\s*"[^"]*"')
+                _save_variable("WEBHOOK_URL", f'WEBHOOK_URL  = "{WEBHOOK_URL}"', r'^WEBHOOK_URL\s*=\s*"[^"]*"')
                 ln_ok("Webhook mis à jour.")
         elif choix == "4":
             _menu_notif()
@@ -1338,7 +1340,7 @@ def _menu_notif():
     mapping = {"1": "overlay", "2": "sound", "3": "windows"}
     if choix in mapping:
         NOTIF_TYPE   = mapping[choix]
-        _save_variable("NOTIF_TYPE", f'NOTIF_TYPE   = "{NOTIF_TYPE}"', r'NOTIF_TYPE\s*=\s*"[^"]*"')
+        _save_variable("NOTIF_TYPE", f'NOTIF_TYPE   = "{NOTIF_TYPE}"', r'^NOTIF_TYPE\s*=\s*"[^"]*"')
         ln_ok(f"Notification mise à jour : {NOTIF_TYPE}")
         # Test immédiat
         console.print("  [dim]Test de la notification...[/]")
@@ -1354,7 +1356,7 @@ def _save_variable(name: str, new_line: str, pattern: str):
             content = f.read()
         import re as _re
         _nl = new_line
-        new_content = _re.sub(pattern, lambda m: _nl, content)
+        new_content = _re.sub(pattern, lambda m: _nl, content, flags=_re.MULTILINE)
         with open(script_path, "w", encoding="utf-8") as f:
             f.write(new_content)
         log_write("INFO", f"{name} sauvegarde dans le script.")
