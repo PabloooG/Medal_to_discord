@@ -99,8 +99,12 @@ CLIP_DUREE     = 20
 RETRY_UPLOAD   = 3
 
 # ── Auto-update depuis GitHub ─────────────────────────────────────────────────────
-VERSION     = "3.4"
+VERSION     = "3.5"
 PATCH_NOTES = [
+    "v3.5 : Correction auto-update qui corrompait le script a chaque mise a jour",
+    "v3.5 : Correction NOTIF_TYPE toujours force a windows peu importe le choix",
+    "v3.5 : Correction PSEUDO toujours force a Pablo_G peu importe ce qui etait tape",
+    "v3.5 : Correction auto-update ecrasait les settings avec le script brut de GitHub",
     "v3.4 : Fenetre visible au demarrage manuel, cachee seulement si lancement automatique",
     "v3.4 : [H] cache la console immediatement puis affiche le tray",
     "v3.4 : Anti-doublon tray — [H] ignore si tray deja actif",
@@ -172,7 +176,11 @@ def check_update():
                 except Exception:
                     pass
                 break
-        if latest == VERSION:
+        def _ver_tuple(v):
+            try: return tuple(int(x) for x in v.strip().split("."))
+            except: return (0,)
+
+        if _ver_tuple(latest) <= _ver_tuple(VERSION):
             ln_ok(f"Version {VERSION} — a jour.")
             return
 
