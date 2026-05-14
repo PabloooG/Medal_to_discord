@@ -99,8 +99,9 @@ CLIP_DUREE     = 20
 RETRY_UPLOAD   = 3
 
 # ── Auto-update depuis GitHub ─────────────────────────────────────────────────────
-VERSION     = "3.10"
+VERSION     = "3.11"
 PATCH_NOTES = [
+    "v3.11 : Raccourcis C/H/Q affiches au demarrage avant passage en tray",
     "v3.10 : Restauration tray ne wipe plus la console — infos de demarrage preservees",
     "v3.9 : Fix critique mise a jour — script complet preserve (plus d'IndentationError)",
     "v3.8 : Wipe console apres config/tray mais garde l'affichage complet au demarrage",
@@ -932,6 +933,10 @@ def main():
     observer = Observer()
     observer.schedule(MedalHandler(), FOLDER, recursive=True)
     observer.start()
+
+    # Afficher les raccourcis avant de passer en tray
+    if not SILENT:
+        _print_shortcuts()
 
     # Démarrage toujours en tray — évite toute double fenetre
     Thread(target=notify_startup, daemon=True).start()
