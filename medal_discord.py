@@ -99,7 +99,7 @@ CLIP_DUREE     = 20
 RETRY_UPLOAD   = 3
 
 # ── Auto-update depuis GitHub ─────────────────────────────────────────────────────
-VERSION     = "3.4"
+VERSION     = "3.5"
 PATCH_NOTES = [
     "v3.4 : Fenetre visible au demarrage manuel, cachee seulement si lancement automatique",
     "v3.4 : [H] cache la console immediatement puis affiche le tray",
