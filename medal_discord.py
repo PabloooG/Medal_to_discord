@@ -99,8 +99,9 @@ CLIP_DUREE     = 20
 RETRY_UPLOAD   = 3
 
 # ── Auto-update depuis GitHub ─────────────────────────────────────────────────────
-VERSION     = "3.8"
+VERSION     = "3.9"
 PATCH_NOTES = [
+    "v3.9 : Fix critique mise a jour — script complet preserve (plus d'IndentationError)",
     "v3.8 : Wipe console apres config/tray mais garde l'affichage complet au demarrage",
     "v3.7 : Console effacee automatiquement apres config ou restauration tray",
     "v3.6 : Test mise a jour automatique",
@@ -221,8 +222,10 @@ def check_update():
                 elif _s.startswith("NOTIF" + "_TYPE") and "=" in _s:
                     _indent = _ln[: len(_ln) - len(_ln.lstrip())]
                     _lines_out.append(_indent + "NOTIF_TYPE   = " + _q + _notif + _q + chr(10))
+                else:
+                    _lines_out.append(_ln)
             # ─────────────────────────────────────────────────────────────
-            final_script = "".join(_lines_out) if _lines_out else new_script
+            final_script = "".join(_lines_out)
             with open(script_path, "w", encoding="utf-8") as f:
                 f.write(final_script)
             ln_ok(f"Mise a jour v{latest} telechargee !")
