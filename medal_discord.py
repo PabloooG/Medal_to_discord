@@ -99,8 +99,10 @@ CLIP_DUREE     = 20
 RETRY_UPLOAD   = 3
 
 # ── Auto-update depuis GitHub ─────────────────────────────────────────────────────
-VERSION     = "3.6"
+VERSION     = "3.7"
 PATCH_NOTES = [
+    "v3.7 : Console effacee automatiquement apres config ou restauration tray",
+    "v3.6 : Test mise a jour automatique",
     "v3.5 : Demarrage direct en tray — plus de double fenetre possible",
     "v3.5 : Fix NOTIF_TYPE toujours sauvegarde comme windows dans le menu config",
     "v3.5 : Fix PSEUDO toujours sauvegarde comme Pablo_G peu importe la valeur saisie",
@@ -943,13 +945,7 @@ def main():
                     observer = Observer()
                     observer.schedule(MedalHandler(), FOLDER, recursive=True)
                     observer.start()
-                    if not SILENT:
-                        separator()
-                        active2 = Text()
-                        active2.append("▶ ", style="bold green")
-                        active2.append("Surveillance reprise...", style="bold green")
-                        console.print(active2)
-                        _print_shortcuts()
+                    _clear_and_redraw()
                 elif key == "h":
                     _hide_window()
                 elif key == "q" or key == "\x03":
@@ -981,6 +977,19 @@ def _getch() -> str:
         return msvcrt.getwch()
     except Exception:
         return ""
+
+def _clear_and_redraw():
+    """Efface la console et reaffiche l'interface de base."""
+    if SILENT: return
+    import os as _os
+    _os.system("cls")
+    print_header()
+    separator()
+    active_txt = Text()
+    active_txt.append("▶ ", style="bold green")
+    active_txt.append("Surveillance active — nouveaux clips seulement...", style="bold green")
+    console.print(active_txt)
+    _print_shortcuts()
 
 def _print_shortcuts():
     if SILENT: return
@@ -1089,13 +1098,6 @@ def _run_tray():
             global _tray_running
             _tray_running = False
             icon.stop()
-            if not SILENT:
-                separator()
-                active_txt = Text()
-                active_txt.append("▶ ", style="bold green")
-                active_txt.append("Surveillance active — nouveaux clips seulement...", style="bold green")
-                console.print(active_txt)
-                _print_shortcuts()
             if hwnd:
                 GWL_EXSTYLE      = -20
                 WS_EX_TOOLWINDOW = 0x00000080
@@ -1116,6 +1118,7 @@ def _run_tray():
                 # 3) Restaurer et mettre au premier plan
                 ctypes.windll.user32.ShowWindow(hwnd, 9)
                 ctypes.windll.user32.SetForegroundWindow(hwnd)
+            _clear_and_redraw()
 
         def on_quit(icon, item):
             global _tray_running
