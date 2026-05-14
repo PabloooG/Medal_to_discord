@@ -99,8 +99,9 @@ CLIP_DUREE     = 20
 RETRY_UPLOAD   = 3
 
 # ── Auto-update depuis GitHub ─────────────────────────────────────────────────────
-VERSION     = "3.7"
+VERSION     = "3.8"
 PATCH_NOTES = [
+    "v3.8 : Wipe console apres config/tray mais garde l'affichage complet au demarrage",
     "v3.7 : Console effacee automatiquement apres config ou restauration tray",
     "v3.6 : Test mise a jour automatique",
     "v3.5 : Demarrage direct en tray — plus de double fenetre possible",
@@ -984,7 +985,6 @@ def _clear_and_redraw():
     import os as _os
     _os.system("cls")
     print_header()
-    separator()
     active_txt = Text()
     active_txt.append("▶ ", style="bold green")
     active_txt.append("Surveillance active — nouveaux clips seulement...", style="bold green")
