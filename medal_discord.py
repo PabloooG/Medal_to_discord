@@ -668,23 +668,39 @@ PHRASES_CLIP = [
 
 
 def notify_clip_sent(game: str, size_mb: float, duration: float):
-    """Joue une petite melodie pour signaler qu'un clip a ete envoye."""
+    """Joue une petite melodie douce pour signaler qu'un clip a ete envoye."""
     try:
         import winsound
-        notes = [(988, 80), (1319, 80), (1568, 140)]
+        import time
+        # Mélodie légère et agréable à l'oreille
+        # Fréquences plus basses pour moins agresser
+        notes = [
+            (659, 50),   # Mi
+            (784, 50),   # Sol
+            (880, 80),   # La - note finale un peu plus longue
+        ]
         for freq, dur in notes:
             winsound.Beep(freq, dur)
+            time.sleep(0.04)  # Petite pause entre les notes
     except Exception as e:
         log_write("WARN", f"Notification son echouee : {e}")
 
 
 def _notif_detected():
-    """Melodie douce jouee des qu'un clip est spotte."""
+    """Melodie douce et legere quand un clip est spotte."""
     try:
         import winsound
-        notes = [(988, 40), (1319, 40), (1568, 70)]
+        import time
+        # Mélodie douce avec pauses entre les notes
+        # Fréquences basses + courtes durées = moins agressif pour les oreilles
+        notes = [
+            (659, 60),   # Mi - 60ms
+            (784, 60),   # Sol - 60ms
+            (988, 100),  # Si - 100ms
+        ]
         for freq, dur in notes:
             winsound.Beep(freq, dur)
+            time.sleep(0.05)  # Pause de 50ms entre les notes
     except Exception:
         pass
 
