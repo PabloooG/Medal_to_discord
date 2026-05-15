@@ -99,7 +99,7 @@ CLIP_DUREE     = 20
 RETRY_UPLOAD   = 3
 
 # ── Auto-update depuis GitHub ─────────────────────────────────────────────────────
-VERSION     = "4.1"
+VERSION     = "4.2"
 PATCH_NOTES = [
     "v4.0 : Correction overlay/notif — le choix dans le menu etait ignore",
     "v3.8 : Correction critique — auto-update generait un fichier vide (1 Ko) apres MAJ",
@@ -1341,7 +1341,8 @@ def _menu_notif():
     choix = input().strip()
     mapping = {"1": "overlay", "2": "sound", "3": "windows"}
     if choix in mapping:
-        NOTIF_TYPE   = mapping[choix]
+        globals()["NOTIF_TYPE"] = mapping[choix]
+        NOTIF_TYPE = globals()["NOTIF_TYPE"]
         ln_ok(f"DEBUG choix={repr(choix)} NOTIF_TYPE={repr(NOTIF_TYPE)}")
         _save_variable("NOTIF_TYPE", f'NOTIF_TYPE   = "{NOTIF_TYPE}"', r'^NOTIF_TYPE\s*=\s*"[^"]*"')
         ln_ok(f"Notification mise à jour : {NOTIF_TYPE}")
