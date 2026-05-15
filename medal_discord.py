@@ -98,8 +98,10 @@ CLIP_DUREE     = 20
 RETRY_UPLOAD   = 3
 
 # ── Auto-update depuis GitHub ─────────────────────────────────────────────────────
-VERSION     = "5.0"
+VERSION     = "5.2"
 PATCH_NOTES = [
+    "v5.2 : Melodie douce a la detection du clip, plus rien a l'envoi",
+    "v5.2 : Volume reduit — notes plus courtes",
     "v5.0 : Notification remplacee par melodie sonore custom (fonctionne en jeu)",
     "v5.0 : Phrases droles maintenant envoyees dans le message Discord avec le clip",
     "v5.0 : Menu config simplifie — plus d'option notification",
@@ -641,7 +643,6 @@ def process_clip(file_path: str):
     else:
         log_write("OK  ", f"Clip envoye : {name}  {size_mb:.2f} MB  {keep:.0f}s  {dt:.1f}s")
         with stats_lock: stats["reussis"] += 1
-        Thread(target=notify_clip_sent, args=(game, size_mb, keep), daemon=True).start()
 
     try: os.remove(converted)
     except Exception: pass
@@ -681,6 +682,16 @@ def notify_clip_sent(game: str, size_mb: float, duration: float):
         log_write("WARN", f"Notification son echouee : {e}")
 
 
+def _notif_detected():
+    """Melodie douce jouee des qu'un clip est spotte."""
+    try:
+        import winsound
+        notes = [(988, 40), (1319, 40), (1568, 70)]
+        for freq, dur in notes:
+            winsound.Beep(freq, dur)
+    except Exception:
+        pass
+
 # ── Watchdog ──────────────────────────────────────────────────────────────────────
 class MedalHandler(FileSystemEventHandler):
     def on_created(self, event):
@@ -692,6 +703,7 @@ class MedalHandler(FileSystemEventHandler):
             with stats_lock:
                 stats["queue"] = clip_queue.qsize()
             ln_warn(f"Clip détecté : {os.path.basename(event.src_path)}")
+            Thread(target=_notif_detected, daemon=True).start()
 
 # ── Desinstalleur ─────────────────────────────────────────────────────────────────
 def create_uninstaller():
