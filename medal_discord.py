@@ -1,6 +1,6 @@
 """
 Medal → Discord  |  GPU h264_nvenc  |  720p  |  20s  |  10 MB max qualité optimale
-Dépendances : pip install rich watchdog requests pystray pillow
+Dépendances : pip install rich watchdog requests
 """
 
 import time
@@ -17,27 +17,6 @@ from threading import Thread, Lock
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
-# ── Log file ─────────────────────────────────────────────────────────────────────
-LOG_FILE      = os.path.join(os.path.dirname(os.path.abspath(__file__)), "medal_discord.log")
-LOG_MAX_LINES = 500
-
-def log_write(level: str, msg: str):
-    """Ecrit une ligne dans le fichier log avec rotation automatique."""
-    try:
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        line = f"[{timestamp}] [{level}] {msg}\n"
-        lines = []
-        if os.path.exists(LOG_FILE):
-            with open(LOG_FILE, "r", encoding="utf-8") as f:
-                lines = f.readlines()
-        lines.append(line)
-        if len(lines) > LOG_MAX_LINES:
-            lines = lines[-LOG_MAX_LINES:]
-        with open(LOG_FILE, "w", encoding="utf-8") as f:
-            f.writelines(lines)
-    except Exception:
-        pass
-
 # ── Détection mode silencieux ────────────────────────────────────────────────────
 # pythonw.exe n'a pas de console (sys.stdout est None)
 SILENT = sys.stdout is None
@@ -49,216 +28,30 @@ if not SILENT:
     console = Console(highlight=False)
 
 def ln_ok(msg):
-    log_write("OK  ", msg)
     if not SILENT: console.print(Text.assemble(("✔ ", "bold green"), (msg, "green")))
 
 def ln_warn(msg):
-    log_write("WARN", msg)
     if not SILENT: console.print(Text.assemble(("⚠ ", "bold yellow"), (msg, "yellow")))
 
 def ln_err(msg):
-    log_write("ERR ", msg)
     if not SILENT: console.print(Text.assemble(("✖ ", "bold red"), (msg, "red")))
 
 def separator():
     if not SILENT: console.rule(style="bright_black")
 
-# ── CONFIGURATION ────────────────────────────────────────────────────────────────
+# ── CONFIGURATION ──────────────────────────────────────────────────────────────
 WEBHOOK_URL  = "https://discord.com/api/webhooks/1499530486928904312/DvR9lA-bgAXE4omeyDYMP1VHreXcUjD50lhzlVvL5Xei2qmJiJkUDRqfQHV3FYAwD1e1"
-FOLDER       = r"F:\Medal\Clips"
-FFMPEG_PATH  = r"C:\Users\j-phi\Desktop\Medal_to_Discord\ffmpeg\bin\ffmpeg.exe"
+FOLDER       = r"f:\Medal\Clips"
+FFMPEG_PATH  = r"C:\Users\j-phi\Desktop\Medal a Discord\ffmpeg-8.0.1-full_build\bin\ffmpeg.exe"
 FFPROBE_PATH = FFMPEG_PATH.replace("ffmpeg.exe", "ffprobe.exe")
 
-# ── Détection automatique FFmpeg si chemin configuré introuvable ─────────────────
-def _resolve_ffmpeg():
-    global FFMPEG_PATH, FFPROBE_PATH
-    if os.path.isfile(FFMPEG_PATH):
-        return
-
-    fallback = os.path.join(
-        os.path.expanduser("~"), "Desktop",
-        "Medal_to_Discord", "ffmpeg", "bin", "ffmpeg.exe"
-    )
-    if os.path.isfile(fallback):
-        FFMPEG_PATH  = fallback
-        FFPROBE_PATH = fallback.replace("ffmpeg.exe", "ffprobe.exe")
-        return
-
-    import shutil
-    found = shutil.which("ffmpeg")
-    if found:
-        FFMPEG_PATH  = found
-        FFPROBE_PATH = found.replace("ffmpeg.exe", "ffprobe.exe")
-
-PSEUDO       = "Pablo_G"
+PSEUDO         = "Pablo_G"   # ← Nom affiché sur Discord
 LIMIT_MB       = 10
 MARGE_SECURITE = 0.95
 AUDIO_KBPS     = 128
 CLIP_DUREE     = 20
 RETRY_UPLOAD   = 3
-
-# ── Auto-update depuis GitHub ─────────────────────────────────────────────────────
-VERSION     = "5.3"
-PATCH_NOTES = [
-    "v5.2 : Melodie douce a la detection du clip, plus rien a l'envoi",
-    "v5.2 : Volume reduit — notes plus courtes",
-    "v5.0 : Notification remplacee par melodie sonore custom (fonctionne en jeu)",
-    "v5.0 : Phrases droles maintenant envoyees dans le message Discord avec le clip",
-    "v5.0 : Menu config simplifie — plus d'option notification",
-    "v4.3 : Overlay defini par defaut au lieu de windows toast",
-    "v3.8 : Correction critique — auto-update generait un fichier vide (1 Ko) apres MAJ",
-    "v3.5 : Correction auto-update qui corrompait le script a chaque mise a jour",
-    "v3.5 : Correction NOTIF_TYPE toujours force a windows peu importe le choix",
-    "v3.5 : Correction PSEUDO toujours force a Pablo_G peu importe ce qui etait tape",
-    "v3.5 : Correction auto-update ecrasait les settings avec le script brut de GitHub",
-    "v3.4 : Fenetre visible au demarrage manuel, cachee seulement si lancement automatique",
-    "v3.4 : [H] cache la console immediatement puis affiche le tray",
-    "v3.4 : Anti-doublon tray — [H] ignore si tray deja actif",
-    "v3.3 : Demarrage fantome total — aucun tray, aucune barre des taches. Tray uniquement sur [H]",
-    "v3.3 : Correction unicodeescape dans check_update et config_menu (chemins Windows hardcodes)",
-    "v3.3 : Auto-update reactivee (avait ete desactivee temporairement en v3.2)",
-    "v3.2 : Touche [H] minimise dans le system tray avec icone (clic droit pour restaurer ou quitter)",
-    "v3.1 : Correction SyntaxError unicodeescape lors des mises a jour (chemins Windows)",
-    "v3.0 : Banque de 15 phrases droles apres chaque clip + 15 phrases pour la touche H",
-    "v2.9 : Touche [H] pour cacher la fenetre + notification au demarrage",
-    "v2.8 : Correction definitive bad escape backslash (lambda re.sub)",
-    "v2.6 : Notification locale apres chaque clip envoye",
-]
-GITHUB_RAW  = "https://raw.githubusercontent.com/PabloooG/Medal_to_discord/main/medal_discord.py"
-
-def notify_update_discord(old_version: str, new_version: str, patch_notes: list):
-    """Envoie un message de succes de mise a jour sur Discord."""
-    try:
-        lines = []
-        lines.append(f"🔄 **Mise à jour**  v{old_version} → v{new_version}  ✅")
-        lines.append(f"👤 {PSEUDO}")
-        lines.append("")
-        lines.append("📋 **Patch-note**")
-        for note in patch_notes:
-            lines.append(f"  ▸ {note}")
-        lines.append("")
-        lines.append("⏭️ Prochaine vérif au redémarrage...")
-        msg = "\n".join(lines)
-        requests.post(WEBHOOK_URL, json={"content": msg}, timeout=10)
-    except Exception:
-        pass
-
-def notify_error_discord(old_version: str, new_version: str, error_msg: str):
-    """Envoie un message d erreur sur Discord si la mise a jour echoue."""
-    try:
-        lines = []
-        lines.append(f"❌ **Echec mise à jour**  v{old_version} → v{new_version}")
-        lines.append(f"👤 {PSEUDO}")
-        lines.append("")
-        lines.append("⚠️ **Erreur**")
-        lines.append(f"  ▸ {error_msg}")
-        msg = "\n".join(lines)
-        requests.post(WEBHOOK_URL, json={"content": msg}, timeout=10)
-    except Exception:
-        pass
-
-def check_update():
-    """Verifie si une nouvelle version est disponible sur GitHub et met a jour si besoin."""
-    if not SILENT:
-        console.print()
-        console.print("  [dim]Verification des mises a jour...[/]")
-    log_write("INFO", "Verification des mises a jour...")
-    try:
-        r = requests.get(GITHUB_RAW, timeout=10)
-        if r.status_code != 200:
-            ln_warn(f"Impossible de verifier la version (HTTP {r.status_code})")
-            return
-        latest = "?"
-        patch_notes_github = []
-        for line in r.text.splitlines():
-            if line.strip().startswith("VERSION"):
-                latest = line.split("=")[1].strip().strip('"')
-                break
-        import ast
-        for line in r.text.splitlines():
-            if line.strip().startswith("PATCH_NOTES"):
-                try:
-                    patch_notes_github = ast.literal_eval(line.split("=", 1)[1].strip())
-                except Exception:
-                    pass
-                break
-        def _ver_tuple(v):
-            try: return tuple(int(x) for x in v.strip().split("."))
-            except: return (0,)
-
-        if _ver_tuple(latest) <= _ver_tuple(VERSION):
-            ln_ok(f"Version {VERSION} — a jour.")
-            return
-
-        ln_warn(f"Nouvelle version {latest} disponible ! (actuelle : {VERSION})")
-        if not SILENT:
-            console.print("  [dim cyan]Mise a jour en cours...[/]")
-        log_write("INFO", f"Mise a jour {VERSION} -> {latest} en cours...")
-
-        script_path = os.path.abspath(__file__)
-        backup_path = script_path + ".bak"
-        try:
-            import shutil
-            shutil.copy2(script_path, backup_path)
-        except Exception:
-            pass
-
-        try:
-            # ── Preservation des variables du client ──────────────────────
-            import re as _re
-            _webhook    = WEBHOOK_URL
-            _folder     = FOLDER
-            _pseudo     = PSEUDO
-            _ffmpeg     = FFMPEG_PATH
-            new_script = r.text
-            # Substitution des variables utilisateur - remplacement ligne par ligne
-            # pour eviter tout conflit regex sur le code source lui-meme
-            _q = chr(34)
-            _lines_out = []
-            for _ln in new_script.splitlines(keepends=True):
-                _s = _ln.lstrip()
-                if _s.startswith("WEBHOOK" + "_URL") and "=" in _s and not _ln.startswith(" "):
-                    _lines_out.append("WEBHOOK" + "_URL  = " + _q + _webhook + _q + chr(10))
-                elif _s.startswith("FOLDER") and "=" in _s and not _s.startswith("FOLDER"):
-                    _lines_out.append(_ln)
-                elif _s.startswith("FOL" + "DER") and "=" in _s and "r" + _q in _s:
-                    _indent = _ln[: len(_ln) - len(_ln.lstrip())]
-                    _lines_out.append(_indent + "FOL" + "DER       = r" + _q + _folder + _q + chr(10))
-                elif _s.startswith("PS" + "EUDO") and "=" in _s:
-                    _indent = _ln[: len(_ln) - len(_ln.lstrip())]
-                    _lines_out.append(_indent + "PS" + "EUDO       = " + _q + _pseudo + _q + chr(10))
-                elif _s.startswith("FFMPEG" + "_PATH") and "=" in _s and "r" + _q in _s:
-                    _indent = _ln[: len(_ln) - len(_ln.lstrip())]
-                    _lines_out.append(_indent + "FFMPEG" + "_PATH  = r" + _q + _ffmpeg + _q + chr(10))
-                else:
-                    _lines_out.append(_ln)
-            # ─────────────────────────────────────────────────────────────
-            with open(script_path, "w", encoding="utf-8") as f:
-                f.write("".join(_lines_out))
-            ln_ok(f"Mise a jour v{latest} telechargee !")
-            flag_path = script_path + ".updated"
-            with open(flag_path, "w", encoding="utf-8") as _f:
-                _f.write(f"{VERSION}→{latest}")
-            os.execv(sys.executable, [sys.executable] + sys.argv)
-        except Exception as e:
-            err = str(e)
-            ln_err(f"Echec ecriture du script : {err}")
-            notify_error_discord(VERSION, latest, err)
-            try:
-                import shutil
-                shutil.copy2(backup_path, script_path)
-                ln_warn("Ancien script restaure depuis le backup.")
-            except Exception:
-                pass
-
-    except requests.exceptions.ConnectionError:
-        ln_warn("Pas de connexion internet — verification update ignoree.")
-    except Exception as e:
-        err = str(e)
-        ln_warn(f"Verification update echouee : {err}")
-        notify_error_discord(VERSION, "?", err)
-
-# ─────────────────────────────────────────────────────────────────────────────────
+# ────────────────────────────────────────────────────────────────────────────────
 
 stats      = {"traites": 0, "reussis": 0, "echoues": 0, "queue": 0}
 stats_lock = Lock()
@@ -266,7 +59,7 @@ stats_lock = Lock()
 TEMP_DIR  = os.environ.get("TEMP", os.path.expanduser("~"))
 NO_WINDOW = subprocess.CREATE_NO_WINDOW
 
-# ── Affichage ─────────────────────────────────────────────────────────────────────
+# ── Affichage ────────────────────────────────────────────────────────────────────
 def print_header():
     if SILENT: return
     console.print()
@@ -278,7 +71,7 @@ def print_header():
     t.append(f"{CLIP_DUREE}s", style="bold yellow")
     t.append(f" fixes  |  max ", style="dim white")
     t.append(f"{LIMIT_MB} MB", style="bold yellow")
-    t.append(f"  qualité optimale 2-pass  |  v{VERSION}", style="dim white")
+    t.append("  qualité optimale 2-pass", style="dim white")
     console.print(t)
     console.rule(style="bright_black")
 
@@ -296,10 +89,8 @@ def print_stats():
     t.append(str(stats["queue"]), style="bold white")
     console.print(t)
 
-# ── File d'attente ────────────────────────────────────────────────────────────────
+# ── File d'attente ───────────────────────────────────────────────────────────────
 clip_queue = Queue()
-processed_files = set()  # Anti-doublon : fichiers déjà en queue
-processed_lock = Lock()
 
 def worker():
     while True:
@@ -320,7 +111,7 @@ def worker():
 
 Thread(target=worker, daemon=True).start()
 
-# ── Cleanup ───────────────────────────────────────────────────────────────────────
+# ── Cleanup ──────────────────────────────────────────────────────────────────────
 def cleanup_leftover_tmps():
     cnt = 0
     for f in glob.glob(os.path.join(FOLDER, "**/*_discord*.mp4"), recursive=True):
@@ -334,7 +125,7 @@ def cleanup_leftover_tmps():
 
 atexit.register(cleanup_leftover_tmps)
 
-# ── Utilitaires ───────────────────────────────────────────────────────────────────
+# ── Utilitaires ──────────────────────────────────────────────────────────────────
 def wait_for_file(path: str, timeout: int = 60, stable_secs: int = 3) -> bool:
     deadline     = time.time() + timeout
     last_size    = -1
@@ -387,7 +178,7 @@ def calcul_bitrate_video(duration_s: float, limit_mb: float = LIMIT_MB,
     video_bits  = max(budget_bits - audio_bits, 500_000 * duration_s)
     return int(video_bits / duration_s)
 
-# ── Encodage GPU 2-pass ───────────────────────────────────────────────────────────
+# ── Encodage GPU 2-pass ──────────────────────────────────────────────────────────
 def encode_2pass(input_path: str, output_path: str,
                  trim_start: float, duration: float,
                  video_bps: int) -> int:
@@ -422,6 +213,7 @@ def encode_2pass(input_path: str, output_path: str,
     ]
     labels = ["passe 1/2 (analyse)", "passe 2/2 (encodage)"]
 
+    # ── Mode avec affichage (console disponible) ─────────────────────────────
     if not SILENT:
         with Progress(
             TextColumn("    {task.description}", style="dim"),
@@ -440,19 +232,19 @@ def encode_2pass(input_path: str, output_path: str,
                     prog.update(t, completed=100,
                                 status=f"[bold red]ERREUR[/] [dim]({dt:.1f}s)[/]")
                     console.print(f"    [dim red]{result.stderr[-400:]}[/]")
-                    log_write("ERR ", f"Encodage echoue ({label}) : {result.stderr[-200:]}")
                     for f in glob.glob(passlog + "*"):
                         try: os.remove(f)
                         except Exception: pass
                     return -1
                 prog.update(t, completed=100,
                             status=f"[bold green]OK[/] [dim]{dt:.1f}s[/]")
+
+    # ── Mode silencieux (pythonw / planificateur) ────────────────────────────
     else:
         for cmd in passes:
             result = subprocess.run(cmd, capture_output=True, text=True,
                                     cwd=TEMP_DIR, creationflags=NO_WINDOW)
             if result.returncode != 0:
-                log_write("ERR ", f"Encodage echoue (silencieux) : {result.stderr[-200:]}")
                 for f in glob.glob(passlog + "*"):
                     try: os.remove(f)
                     except Exception: pass
@@ -464,11 +256,10 @@ def encode_2pass(input_path: str, output_path: str,
 
     return os.path.getsize(output_path) if os.path.exists(output_path) else -1
 
-# ── Upload Discord ────────────────────────────────────────────────────────────────
+# ── Upload Discord ───────────────────────────────────────────────────────────────
 def build_discord_message(game: str, size_mb: float,
                            duration: float, video_kbps: int) -> str:
-    heure  = datetime.now().strftime("%H:%M")
-    phrase = random.choice(PHRASES_CLIP)
+    heure = datetime.now().strftime("%H:%M")
     return (
         f"🎮 **{game}**\n"
         f"👤 {PSEUDO}\n"
@@ -476,8 +267,7 @@ def build_discord_message(game: str, size_mb: float,
         f"⚖️ {size_mb:.1f} MB  |  "
         f"⏱️ {duration:.0f}s  |  "
         f"📡 {video_kbps} kbps  |  "
-        f"⏰ {heure}\n"
-        f"💬 *{phrase}*"
+        f"⏰ {heure}"
     )
 
 def upload_discord(result_path: str, message: str) -> object:
@@ -537,12 +327,11 @@ def upload_discord(result_path: str, message: str) -> object:
 
     return resp
 
-# ── Traitement principal ──────────────────────────────────────────────────────────
+# ── Traitement principal ─────────────────────────────────────────────────────────
 def process_clip(file_path: str):
     name = os.path.basename(file_path)
     game = detect_game(file_path)
 
-    log_write("INFO", f"Clip detecte : {name}")
     separator()
     if not SILENT:
         title = Text()
@@ -636,10 +425,8 @@ def process_clip(file_path: str):
         console.print(fl)
 
     if isinstance(resp, Exception) or resp.status_code not in (200, 201):
-        log_write("ERR ", f"Upload echoue : {resp}")
         with stats_lock: stats["echoues"] += 1
     else:
-        log_write("OK  ", f"Clip envoye : {name}  {size_mb:.2f} MB  {keep:.0f}s  {dt:.1f}s")
         with stats_lock: stats["reussis"] += 1
 
     try: os.remove(converted)
@@ -647,159 +434,22 @@ def process_clip(file_path: str):
 
     with stats_lock: stats["traites"] += 1
 
-# ── Banque de phrases drôles ──────────────────────────────────────────────────────
-import random
-PHRASES_CLIP = [
-    "Un autre chef-d'oeuvre livre.",
-    "Discord vient de recevoir un banger.",
-    "Clip poste. Gloire eternelle en approche.",
-    "Les gars vont kiffer.",
-    "Vas-y, fais semblant que c'etait prevu.",
-    "Certifie clip de ouf.",
-    "Envoye plus vite que ton ping.",
-    "Historique. Tout simplement.",
-    "T'as encore fait ca toi.",
-    "On encadre et on accroche au mur.",
-    "Tes ennemis ont vu ca. Ils pleurent.",
-    "Clip recu 5 etoiles sur Discord.",
-    "Le serveur a fremi a la reception.",
-    "Quelqu'un quelque part est jaloux.",
-    "Clip livre. Signature en bas a droite.",
-]
-
-
-
-def notify_clip_sent(game: str, size_mb: float, duration: float):
-    """Ancien système - pas utilisé. La mélodie se joue à la DÉTECTION seulement."""
-    pass
-
-
-def _notif_detected():
-    """Melodie douce et legere quand un clip est spotte."""
-    try:
-        import winsound
-        import time
-        # Trois notes douces et rapides - pas agressif
-        notes = [
-            (659, 100),   # Mi - doux
-            (784, 100),   # Sol - mid-range
-            (988, 150),   # Si - final
-        ]
-        for freq, dur in notes:
-            winsound.Beep(freq, dur)
-            time.sleep(0.05)  # Petite pause entre les notes
-    except Exception:
-        pass
-
-# ── Watchdog ──────────────────────────────────────────────────────────────────────
+# ── Watchdog ─────────────────────────────────────────────────────────────────────
 class MedalHandler(FileSystemEventHandler):
     def on_created(self, event):
+        print(f"[DEBUG] Fichier détecté : {event.src_path}")  # ← debug
         if event.is_directory: return
         p = event.src_path.lower()
         if "_discord" in p: return
         if p.endswith((".mp4", ".mov", ".avi", ".mkv")):
-            # Anti-doublon : vérifier si le fichier est déjà en attente
-            with processed_lock:
-                if event.src_path in processed_files:
-                    return
-                processed_files.add(event.src_path)
-            
             clip_queue.put(event.src_path)
             with stats_lock:
                 stats["queue"] = clip_queue.qsize()
             ln_warn(f"Clip détecté : {os.path.basename(event.src_path)}")
-            # MÉLODIE SEULEMENT À LA DÉTECTION (pas après envoi)
-            Thread(target=_notif_detected, daemon=True).start()
-
-# ── Desinstalleur ─────────────────────────────────────────────────────────────────
-def create_uninstaller():
-    """Genere desinstaller.bat dans le dossier d'installation au demarrage."""
-    try:
-        install_dir = os.path.dirname(os.path.abspath(__file__))
-        uninst_path = os.path.join(install_dir, "desinstaller.bat")
-        startup_vbs = os.path.join(
-            os.environ.get("APPDATA", ""),
-            "Microsoft", "Windows", "Start Menu",
-            "Programs", "Startup", "Medal Discord.vbs"
-        )
-        lines = [
-            "@echo off\n",
-            "chcp 65001 >nul\n",
-            "color 0C\n",
-            "title Medal to Discord - Desinstalleur\n",
-            "echo.\n",
-            "echo  +------------------------------------------------------+\n",
-            "echo  ^|       Medal to Discord  -  Desinstalleur            ^|\n",
-            "echo  +------------------------------------------------------+\n",
-            "echo.\n",
-            "echo  Cette action va supprimer :\n",
-            "echo.\n",
-            "echo    - Le dossier Medal_to_Discord sur le bureau\n",
-            "echo    - Le demarrage automatique Windows\n",
-            "echo.\n",
-            "echo  Tes clips Medal ne seront PAS supprimes.\n",
-            "echo.\n",
-            'set /p "CONFIRM=  Confirmer la desinstallation ? (O/N) > "\n',
-            'if /i not "%CONFIRM%"=="O" (\n',
-            "    echo.\n",
-            "    echo  Desinstallation annulee.\n",
-            "    timeout /t 2 >nul\n",
-            "    exit /b\n",
-            ")\n",
-            "echo.\n",
-            "echo  [1/2] Suppression du demarrage automatique...\n",
-            f'if exist "{startup_vbs}" (\n',
-            f'    del "{startup_vbs}" >nul 2>&1\n',
-            "    echo        OK : demarrage automatique supprime.\n",
-            ") else (\n",
-            "    echo        Deja absent.\n",
-            ")\n",
-            "echo.\n",
-            "echo  [2/2] Suppression du dossier Medal_to_Discord...\n",
-            'cd /d "%USERPROFILE%\\Desktop"\n',
-            f'if exist "{install_dir}" (\n',
-            f'    rmdir /s /q "{install_dir}"\n',
-            "    echo        OK : dossier supprime.\n",
-            ") else (\n",
-            "    echo        Deja absent.\n",
-            ")\n",
-            "echo.\n",
-            "echo  +------------------------------------------------------+\n",
-            "echo  ^|   Desinstallation terminee.                         ^|\n",
-            "echo  ^|   Medal to Discord a ete retire de ce PC.           ^|\n",
-            "echo  +------------------------------------------------------+\n",
-            "echo.\n",
-            "pause\n",
-        ]
-        with open(uninst_path, "w", encoding="utf-8") as f:
-            f.writelines(lines)
-        log_write("INFO", f"desinstaller.bat cree : {uninst_path}")
-    except Exception as e:
-        log_write("WARN", f"Impossible de creer desinstaller.bat : {e}")
 
 # ── Main ──────────────────────────────────────────────────────────────────────────
 def main():
-    ffmpeg_original = FFMPEG_PATH
-    _resolve_ffmpeg()
     print_header()
-    create_uninstaller()
-    if FFMPEG_PATH != ffmpeg_original:
-        ln_warn(f"FFmpeg reconfiguré automatiquement : {FFMPEG_PATH}")
-    check_update()
-
-    flag_path = os.path.abspath(__file__) + ".updated"
-    if os.path.exists(flag_path):
-        try:
-            with open(flag_path, encoding="utf-8") as _f:
-                _old, _new = _f.read().strip().split("→")
-            os.remove(flag_path)
-            notify_update_discord(_old, _new, PATCH_NOTES)
-            ln_ok(f"Notification mise a jour v{_old} -> v{_new} envoyee sur Discord.")
-        except Exception:
-            pass
-
-    separator()
-
     errors = False
 
     if not os.path.isfile(FFMPEG_PATH):
@@ -850,39 +500,11 @@ def main():
         active.append("▶ ", style="bold green")
         active.append("Surveillance active — nouveaux clips seulement...", style="bold green")
         console.print(active)
-        _print_shortcuts()
-
-    # Démarrage fantôme : cache uniquement si lancé en mode silencieux (démarrage auto)
-    if SILENT:
-        _ghost_hide()
-
-    Thread(target=notify_startup, daemon=True).start()
+        console.print()
 
     try:
         while True:
-            if not SILENT and _kbhit():
-                key = _getch().lower()
-                if key == "c":
-                    observer.stop()
-                    observer.join()
-                    print_stats()
-                    config_menu()
-                    # Redémarre l'observer après config
-                    observer = Observer()
-                    observer.schedule(MedalHandler(), FOLDER, recursive=True)
-                    observer.start()
-                    if not SILENT:
-                        separator()
-                        active2 = Text()
-                        active2.append("▶ ", style="bold green")
-                        active2.append("Surveillance reprise...", style="bold green")
-                        console.print(active2)
-                        _print_shortcuts()
-                elif key == "h":
-                    _hide_window()
-                elif key == "q" or key == "\x03":
-                    raise KeyboardInterrupt
-            time.sleep(0.1)
+            time.sleep(1)
     except KeyboardInterrupt:
         if not SILENT:
             console.print()
@@ -895,366 +517,5 @@ def main():
         console.print()
 
 
-# ── Lecture clavier non-bloquante (Windows) ───────────────────────────────────────
-def _kbhit() -> bool:
-    try:
-        import msvcrt
-        return msvcrt.kbhit()
-    except Exception:
-        return False
-
-def _getch() -> str:
-    try:
-        import msvcrt
-        return msvcrt.getwch()
-    except Exception:
-        return ""
-
-def _print_shortcuts():
-    if SILENT: return
-    t = Text()
-    t.append("  [C] ", style="bold cyan")
-    t.append("Config  ", style="dim")
-    t.append("[H] ", style="bold yellow")
-    t.append("Cacher  ", style="dim")
-    t.append("[Q] ", style="bold red")
-    t.append("Quitter", style="dim")
-    console.print(t)
-    console.print()
-
-
-def _ghost_hide():
-    """Demarrage fantome : cache console + retire barre des taches. Aucun tray."""
-    try:
-        import ctypes
-        hwnd = ctypes.windll.kernel32.GetConsoleWindow()
-        if hwnd:
-            GWL_EXSTYLE      = -20
-            WS_EX_TOOLWINDOW = 0x00000080
-            WS_EX_APPWINDOW  = 0x00040000
-            style = ctypes.windll.user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
-            style = (style | WS_EX_TOOLWINDOW) & ~WS_EX_APPWINDOW
-            ctypes.windll.user32.SetWindowLongW(hwnd, GWL_EXSTYLE, style)
-            ctypes.windll.user32.ShowWindow(hwnd, 0)
-        log_write("INFO", "Mode fantome actif (pas de tray, pas de barre des taches).")
-    except Exception as e:
-        log_write("WARN", f"Ghost hide echoue : {e}")
-
-_tray_running = False
-
-def _hide_window():
-    """[H] : cache la console et affiche le tray. Ignore si tray deja actif."""
-    global _tray_running
-    if _tray_running:
-        return
-    try:
-        import ctypes as _ct
-        import uuid
-
-        GWL_EXSTYLE      = -20
-        WS_EX_TOOLWINDOW = 0x00000080
-        WS_EX_APPWINDOW  = 0x00040000
-        SWP_NOMOVE       = 0x0002
-        SWP_NOSIZE       = 0x0001
-        SWP_NOZORDER     = 0x0004
-        SWP_FRAMECHANGED = 0x0020
-
-        # Renommer la fenetre avec un titre unique pour FindWindow fiable
-        titre_unique = "MedalDiscord_" + uuid.uuid4().hex[:8]
-        _ct.windll.kernel32.SetConsoleTitleW(titre_unique)
-        import time as _time; _time.sleep(0.05)  # laisser Windows mettre a jour
-
-        _hwnd = _ct.windll.user32.FindWindowW(None, titre_unique)
-        if not _hwnd:
-            # fallback GetConsoleWindow
-            _hwnd = _ct.windll.kernel32.GetConsoleWindow()
-
-        if _hwnd:
-            # 1) Changer style (fenetre encore visible)
-            style = _ct.windll.user32.GetWindowLongW(_hwnd, GWL_EXSTYLE)
-            style = (style | WS_EX_TOOLWINDOW) & ~WS_EX_APPWINDOW
-            _ct.windll.user32.SetWindowLongW(_hwnd, GWL_EXSTYLE, style)
-            # 2) Flush — force la taskbar a relire le style
-            _ct.windll.user32.SetWindowPos(
-                _hwnd, 0, 0, 0, 0, 0,
-                SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED
-            )
-            # 3) Cacher
-            _ct.windll.user32.ShowWindow(_hwnd, 0)
-    except Exception:
-        pass
-    Thread(target=_run_tray, daemon=True).start()
-
-def _run_tray():
-    """Affiche l'icone tray uniquement quand [H] est presse."""
-    global _tray_running
-    _tray_running = True
-    try:
-        import pystray
-        from PIL import Image, ImageDraw
-        import ctypes
-
-        # Retrouver le HWND via le titre unique qui a ete defini dans _hide_window
-        # (GetConsoleWindow peut pointer vers le mauvais HWND sous Windows Terminal)
-        hwnd = ctypes.windll.kernel32.GetConsoleWindow()
-        # Chercher aussi via EnumWindows pour valider qu'on a le bon
-        # On recupere le titre actuel de la console pour FindWindow
-        buf = ctypes.create_unicode_buffer(256)
-        ctypes.windll.kernel32.GetConsoleTitleW(buf, 256)
-        titre_actuel = buf.value
-        if titre_actuel:
-            found = ctypes.windll.user32.FindWindowW(None, titre_actuel)
-            if found:
-                hwnd = found
-
-        # Icone cyan avec triangle play
-        img = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
-        draw = ImageDraw.Draw(img)
-        draw.ellipse([4, 4, 60, 60], fill=(0, 200, 255))
-        draw.polygon([(22, 20), (22, 44), (46, 32)], fill=(12, 12, 24))
-
-        def on_restore(icon, item):
-            global _tray_running
-            _tray_running = False
-            icon.stop()
-            if hwnd:
-                GWL_EXSTYLE      = -20
-                WS_EX_TOOLWINDOW = 0x00000080
-                WS_EX_APPWINDOW  = 0x00040000
-                SWP_NOMOVE       = 0x0002
-                SWP_NOSIZE       = 0x0001
-                SWP_NOZORDER     = 0x0004
-                SWP_FRAMECHANGED = 0x0020
-                # 1) Remettre le style normal (visible dans taskbar)
-                style = ctypes.windll.user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
-                style = (style & ~WS_EX_TOOLWINDOW) | WS_EX_APPWINDOW
-                ctypes.windll.user32.SetWindowLongW(hwnd, GWL_EXSTYLE, style)
-                # 2) Flush du style
-                ctypes.windll.user32.SetWindowPos(
-                    hwnd, 0, 0, 0, 0, 0,
-                    SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED
-                )
-                # 3) Restaurer et mettre au premier plan
-                ctypes.windll.user32.ShowWindow(hwnd, 9)
-                ctypes.windll.user32.SetForegroundWindow(hwnd)
-
-        def on_quit(icon, item):
-            global _tray_running
-            _tray_running = False
-            icon.stop()
-            os._exit(0)
-
-        phrase = random.choice(PHRASES_HIDE)
-        menu = pystray.Menu(
-            pystray.MenuItem("Medal -> Discord  actif", None, enabled=False),
-            pystray.MenuItem(f"<< {phrase} >>", None, enabled=False),
-            pystray.Menu.SEPARATOR,
-            pystray.MenuItem("Restaurer la fenetre  [H]", on_restore),
-            pystray.MenuItem("Quitter", on_quit),
-        )
-        icon = pystray.Icon("Medal->Discord", img, "Medal -> Discord", menu)
-        log_write("INFO", "Icone tray affichee (appui [H]).")
-        icon.run()
-
-    except ImportError:
-        _tray_running = False
-        log_write("WARN", "pystray non installe — tray indisponible.")
-    except Exception as e:
-        _tray_running = False
-        log_write("WARN", f"Tray echoue : {e}")
-def notify_startup():
-    """Notification locale au démarrage selon NOTIF_TYPE."""
-    try:
-        if NOTIF_TYPE == "sound":
-            import winsound
-            winsound.MessageBeep(winsound.MB_ICONASTERISK)
-        elif NOTIF_TYPE == "windows":
-            title = "Medal → Discord  ▶"
-            body  = "Surveillance active"
-            ps_cmd = (
-                "Add-Type -AssemblyName System.Windows.Forms;"
-                "[System.Windows.Forms.Application]::EnableVisualStyles();"
-                "$n=New-Object System.Windows.Forms.NotifyIcon;"
-                "$n.Icon=[System.Drawing.SystemIcons]::Application;"
-                "$n.Visible=$true;"
-                f"$n.ShowBalloonTip(3000,'{title}','{body}',"
-                "[System.Windows.Forms.ToolTipIcon]::Info);"
-                "Start-Sleep -Milliseconds 3500;"
-                "$n.Dispose()"
-            )
-            subprocess.Popen(
-                ["powershell", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-Command", ps_cmd],
-                creationflags=subprocess.CREATE_NO_WINDOW
-            )
-        else:  # overlay
-            line1 = "▶  Medal → Discord actif"
-            line2 = "Surveillance active"
-            ps_script = f"""
-Add-Type -AssemblyName System.Windows.Forms
-Add-Type -AssemblyName System.Drawing
-$screen = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
-$W = 320; $H = 68
-$form = New-Object System.Windows.Forms.Form
-$form.FormBorderStyle = 'None'
-$form.ShowInTaskbar   = $false
-$form.TopMost         = $true
-$form.Width  = $W; $form.Height = $H
-$form.Left   = $screen.Right  - $W - 16
-$form.Top    = $screen.Top    + 16
-$form.BackColor   = [System.Drawing.Color]::FromArgb(12,12,24)
-$form.Opacity     = 0.0
-$form.StartPosition = 'Manual'
-$accent = New-Object System.Windows.Forms.Panel
-$accent.Location = '0,0'; $accent.Size = '3,68'
-$accent.BackColor = [System.Drawing.Color]::FromArgb(0,230,255)
-$form.Controls.Add($accent)
-$l1 = New-Object System.Windows.Forms.Label
-$l1.Text      = '{line1}'
-$l1.Location  = '14,10'; $l1.Size = '300,22'
-$l1.Font      = New-Object System.Drawing.Font('Consolas',10,[System.Drawing.FontStyle]::Bold)
-$l1.ForeColor = [System.Drawing.Color]::FromArgb(0,230,255)
-$l1.BackColor = [System.Drawing.Color]::Transparent
-$form.Controls.Add($l1)
-$l2 = New-Object System.Windows.Forms.Label
-$l2.Text      = '{line2}'
-$l2.Location  = '14,34'; $l2.Size = '300,18'
-$l2.Font      = New-Object System.Drawing.Font('Consolas',8)
-$l2.ForeColor = [System.Drawing.Color]::FromArgb(100,160,180)
-$l2.BackColor = [System.Drawing.Color]::Transparent
-$form.Controls.Add($l2)
-$form.Show()
-for ($i=0; $i -le 10; $i++) {{
-    $form.Opacity = $i / 10.0
-    [System.Windows.Forms.Application]::DoEvents()
-    Start-Sleep -Milliseconds 30
-}}
-Start-Sleep -Milliseconds 2600
-for ($i=10; $i -ge 0; $i--) {{
-    $form.Opacity = $i / 10.0
-    [System.Windows.Forms.Application]::DoEvents()
-    Start-Sleep -Milliseconds 30
-}}
-$form.Close()
-$form.Dispose()
-"""
-            subprocess.Popen(
-                ["powershell", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-Command", ps_script],
-                creationflags=subprocess.CREATE_NO_WINDOW
-            )
-    except Exception as e:
-        log_write("WARN", f"Notification démarrage échouée : {e}")
-
-
-def config_menu():
-    """Menu interactif pour modifier les variables sans réinstaller."""
-    if SILENT: return
-
-    global WEBHOOK_URL, FOLDER, PSEUDO, FFMPEG_PATH, FFPROBE_PATH
-
-    while True:
-        separator()
-        console.print()
-        t = Text()
-        t.append("  ⚙  Configuration", style="bold cyan")
-        console.print(t)
-        console.print()
-
-        # Affiche les valeurs actuelles
-        _cfg_row("1", "Pseudo Discord",      PSEUDO)
-        _cfg_row("2", "Dossier clips Medal", FOLDER)
-        _cfg_row("3", "Webhook Discord",     WEBHOOK_URL[:52] + "..." if len(WEBHOOK_URL) > 52 else WEBHOOK_URL)
-        console.print()
-
-        t2 = Text()
-        t2.append("  Choix (1-3) ou ", style="dim")
-        t2.append("[Entrée]", style="bold")
-        t2.append(" pour quitter : ", style="dim")
-        console.print(t2, end="")
-
-        choix = input().strip()
-
-        if choix == "":
-            break
-        elif choix == "1":
-            console.print(f"  Pseudo actuel : [bold]{PSEUDO}[/]  (Entrée pour garder)")
-            console.print("  Nouveau pseudo : ", end="")
-            val = input().strip()
-            if val:
-                PSEUDO       = val
-                _save_variable("PSEUDO", f'PSEUDO       = "{PSEUDO}"', r'^PSEUDO\s*=\s*"[^"]*"')
-                ln_ok(f"Pseudo mis à jour : {PSEUDO}")
-        elif choix == "2":
-            console.print(f"  Dossier actuel : [bold]{FOLDER}[/]  (Entrée pour garder)")
-            console.print("  Nouveau dossier : ", end="")
-            val = input().strip()
-            if val:
-                if not os.path.isdir(val):
-                    ln_err(f"Dossier introuvable : {val}")
-                else:
-                    FOLDER = val
-                    _save_variable("FOLDER", 'FOLDER       = r"' + FOLDER + '"', r'^FOLDER\s*=\s*r"[^"]*"')
-                    ln_ok(f"Dossier mis à jour : {FOLDER}")
-        elif choix == "3":
-            console.print("  Webhook actuel (Entrée pour garder) :")
-            console.print(f"  [dim]{WEBHOOK_URL}[/]")
-            console.print("  Nouveau webhook : ", end="")
-            val = input().strip()
-            if val:
-                WEBHOOK_URL = val
-                _save_variable("WEBHOOK_URL", f'WEBHOOK_URL  = "{WEBHOOK_URL}"', r'^WEBHOOK_URL\s*=\s*"[^"]*"')
-                ln_ok("Webhook mis à jour.")
-        else:
-            ln_warn("Choix invalide.")
-
-    separator()
-
-
-def _cfg_row(key: str, label: str, value: str):
-    """Affiche une ligne de config formatée."""
-    t = Text()
-    t.append(f"  [{key}] ", style="bold cyan")
-    t.append(f"{label:<22}", style="dim")
-    t.append(value, style="bold white")
-    console.print(t)
-
-
-
-def _save_variable(name: str, new_line: str, pattern: str):
-    """Réécrit une variable dans le fichier .py courant."""
-    try:
-        script_path = os.path.abspath(__file__)
-        with open(script_path, "r", encoding="utf-8") as f:
-            content = f.read()
-        import re as _re
-        _nl = new_line
-        new_content = _re.sub(pattern, lambda m: _nl, content, flags=_re.MULTILINE)
-        with open(script_path, "w", encoding="utf-8") as f:
-            f.write(new_content)
-        log_write("INFO", f"{name} sauvegarde dans le script.")
-    except Exception as e:
-        ln_err(f"Impossible de sauvegarder {name} : {e}")
-
-
 if __name__ == "__main__":
-    log_write("INFO", f"=== Script demarre v{VERSION} ===")
-    try:
-        main()
-    except KeyboardInterrupt:
-        log_write("INFO", "Script arrete par l'utilisateur")
-    except Exception as e:
-        import traceback
-        err_detail = traceback.format_exc()
-        log_write("ERR ", f"CRASH : {e}\n{err_detail}")
-        try:
-            lines = []
-            lines.append(f"⚠️ **Crash du script**  v{VERSION}")
-            lines.append(f"👤 {PSEUDO}")
-            lines.append("")
-            lines.append("📋 **Erreur**")
-            lines.append(f"  ▸ {e}")
-            lines.append("")
-            lines.append("🔧 Verifiez le fichier `medal_discord.log` pour plus de details.")
-            msg = "\n".join(lines)
-            requests.post(WEBHOOK_URL, json={"content": msg}, timeout=10)
-        except Exception:
-            pass
+    main()
