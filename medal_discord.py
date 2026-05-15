@@ -91,7 +91,6 @@ def _resolve_ffmpeg():
         FFPROBE_PATH = found.replace("ffmpeg.exe", "ffprobe.exe")
 
 PSEUDO       = "Pablo_G"
-NOTIF_TYPE   = "overlay"
 LIMIT_MB       = 10
 MARGE_SECURITE = 0.95
 AUDIO_KBPS     = 128
@@ -99,8 +98,11 @@ CLIP_DUREE     = 20
 RETRY_UPLOAD   = 3
 
 # ── Auto-update depuis GitHub ─────────────────────────────────────────────────────
-VERSION     = "4.3"
+VERSION     = "5.0"
 PATCH_NOTES = [
+    "v5.0 : Notification remplacee par melodie sonore custom (fonctionne en jeu)",
+    "v5.0 : Phrases droles maintenant envoyees dans le message Discord avec le clip",
+    "v5.0 : Menu config simplifie — plus d'option notification",
     "v4.3 : Overlay defini par defaut au lieu de windows toast",
     "v3.8 : Correction critique — auto-update generait un fichier vide (1 Ko) apres MAJ",
     "v3.5 : Correction auto-update qui corrompait le script a chaque mise a jour",
@@ -465,7 +467,8 @@ def encode_2pass(input_path: str, output_path: str,
 # ── Upload Discord ────────────────────────────────────────────────────────────────
 def build_discord_message(game: str, size_mb: float,
                            duration: float, video_kbps: int) -> str:
-    heure = datetime.now().strftime("%H:%M")
+    heure  = datetime.now().strftime("%H:%M")
+    phrase = random.choice(PHRASES_CLIP)
     return (
         f"🎮 **{game}**\n"
         f"👤 {PSEUDO}\n"
@@ -473,7 +476,8 @@ def build_discord_message(game: str, size_mb: float,
         f"⚖️ {size_mb:.1f} MB  |  "
         f"⏱️ {duration:.0f}s  |  "
         f"📡 {video_kbps} kbps  |  "
-        f"⏰ {heure}"
+        f"⏰ {heure}\n"
+        f"💬 *{phrase}*"
     )
 
 def upload_discord(result_path: str, message: str) -> object:
@@ -664,134 +668,18 @@ PHRASES_CLIP = [
     "Clip livre. Signature en bas a droite.",
 ]
 
-PHRASES_HIDE = [
-    "Cache mais toujours la. Comme un ninja.",
-    "Mode fantome active. Tes clips sont en securite.",
-    "Invisible mais sur le coup.",
-    "Tu me vois plus mais je te vois.",
-    "Disparu des radars. Pas des clips.",
-    "Mode discret ON. Tes highlights sont entre de bonnes mains.",
-    "Je suis la, t'inquiete. Comme ton instinct de gamer.",
-    "Fenetre fermee. Concentration maximale.",
-    "Je suis dans les murs maintenant.",
-    "Meme ta mere sait pas que je tourne.",
-    "Cache comme tes skills au debut de la partie.",
-    "J'existe toujours. Philosophiquement parlant.",
-    "Je surveille tes clips depuis les ombres.",
-    "Tu peux pas m'arreter. T'as meme pas essaye.",
-    "Processus 4327 te salue bien.",
-]
 
 
 def notify_clip_sent(game: str, size_mb: float, duration: float):
-    """Declenche la notification locale selon NOTIF_TYPE apres un envoi reussi."""
+    """Joue une petite melodie pour signaler qu'un clip a ete envoye."""
     try:
-        if NOTIF_TYPE == "sound":
-            _notif_sound()
-        elif NOTIF_TYPE == "windows":
-            _notif_windows_toast(game, size_mb, duration)
-        else:
-            _notif_overlay(game, size_mb, duration)
+        import winsound
+        notes = [(988, 80), (1319, 80), (1568, 140)]
+        for freq, dur in notes:
+            winsound.Beep(freq, dur)
     except Exception as e:
-        log_write("WARN", f"Notification locale echouee : {e}")
+        log_write("WARN", f"Notification son echouee : {e}")
 
-def _notif_sound():
-    """Bip audio systeme Windows."""
-    import winsound
-    winsound.MessageBeep(winsound.MB_ICONASTERISK)
-
-def _notif_windows_toast(game: str, size_mb: float, duration: float):
-    """Notification native Windows via PowerShell (centre de notifications)."""
-    title = f"Medal → Discord  ✔"
-    body  = random.choice(PHRASES_CLIP)
-    ps_cmd = (
-        "Add-Type -AssemblyName System.Windows.Forms;"
-        "[System.Windows.Forms.Application]::EnableVisualStyles();"
-        "$n=New-Object System.Windows.Forms.NotifyIcon;"
-        "$n.Icon=[System.Drawing.SystemIcons]::Application;"
-        "$n.Visible=$true;"
-        f"$n.ShowBalloonTip(3000,'{title}','{body}',"
-        "[System.Windows.Forms.ToolTipIcon]::Info);"
-        "Start-Sleep -Milliseconds 3500;"
-        "$n.Dispose()"
-    )
-    subprocess.Popen(
-        ["powershell", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-Command", ps_cmd],
-        creationflags=subprocess.CREATE_NO_WINDOW
-    )
-
-def _notif_overlay(game: str, size_mb: float, duration: float):
-    """Overlay coin haut-droit — fenetre WinForms transparente, 3 secondes."""
-    line1 = "✔  Clip envoyé sur Discord"
-    line2 = random.choice(PHRASES_CLIP)
-    # Script PowerShell inline pour l'overlay
-    ps_script = f"""
-Add-Type -AssemblyName System.Windows.Forms
-Add-Type -AssemblyName System.Drawing
-
-$screen = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
-$W = 320; $H = 68
-
-$form = New-Object System.Windows.Forms.Form
-$form.FormBorderStyle = 'None'
-$form.ShowInTaskbar   = $false
-$form.TopMost         = $true
-$form.Width  = $W; $form.Height = $H
-$form.Left   = $screen.Right  - $W - 16
-$form.Top    = $screen.Top    + 16
-$form.BackColor   = [System.Drawing.Color]::FromArgb(12,12,24)
-$form.Opacity     = 0.0
-$form.StartPosition = 'Manual'
-
-# Barre accent gauche (neon cyan)
-$accent = New-Object System.Windows.Forms.Panel
-$accent.Location = '0,0'; $accent.Size = '3,{H}'
-$accent.BackColor = [System.Drawing.Color]::FromArgb(0,230,255)
-$form.Controls.Add($accent)
-
-# Ligne 1 : titre
-$l1 = New-Object System.Windows.Forms.Label
-$l1.Text      = '{line1}'
-$l1.Location  = '14,10'; $l1.Size = '300,22'
-$l1.Font      = New-Object System.Drawing.Font('Consolas',10,[System.Drawing.FontStyle]::Bold)
-$l1.ForeColor = [System.Drawing.Color]::FromArgb(0,230,255)
-$l1.BackColor = [System.Drawing.Color]::Transparent
-$form.Controls.Add($l1)
-
-# Ligne 2 : details
-$l2 = New-Object System.Windows.Forms.Label
-$l2.Text      = '{line2}'
-$l2.Location  = '14,34'; $l2.Size = '300,18'
-$l2.Font      = New-Object System.Drawing.Font('Consolas',8)
-$l2.ForeColor = [System.Drawing.Color]::FromArgb(100,160,180)
-$l2.BackColor = [System.Drawing.Color]::Transparent
-$form.Controls.Add($l2)
-
-$form.Show()
-
-# Fade in
-for ($i=0; $i -le 10; $i++) {{
-    $form.Opacity = $i / 10.0
-    [System.Windows.Forms.Application]::DoEvents()
-    Start-Sleep -Milliseconds 30
-}}
-
-Start-Sleep -Milliseconds 2600
-
-# Fade out
-for ($i=10; $i -ge 0; $i--) {{
-    $form.Opacity = $i / 10.0
-    [System.Windows.Forms.Application]::DoEvents()
-    Start-Sleep -Milliseconds 30
-}}
-
-$form.Close()
-$form.Dispose()
-"""
-    subprocess.Popen(
-        ["powershell", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-Command", ps_script],
-        creationflags=subprocess.CREATE_NO_WINDOW
-    )
 
 # ── Watchdog ──────────────────────────────────────────────────────────────────────
 class MedalHandler(FileSystemEventHandler):
@@ -1243,7 +1131,7 @@ def config_menu():
     """Menu interactif pour modifier les variables sans réinstaller."""
     if SILENT: return
 
-    global WEBHOOK_URL, FOLDER, PSEUDO, FFMPEG_PATH, FFPROBE_PATH, NOTIF_TYPE
+    global WEBHOOK_URL, FOLDER, PSEUDO, FFMPEG_PATH, FFPROBE_PATH
 
     while True:
         separator()
@@ -1257,15 +1145,10 @@ def config_menu():
         _cfg_row("1", "Pseudo Discord",      PSEUDO)
         _cfg_row("2", "Dossier clips Medal", FOLDER)
         _cfg_row("3", "Webhook Discord",     WEBHOOK_URL[:52] + "..." if len(WEBHOOK_URL) > 52 else WEBHOOK_URL)
-        _cfg_row("4", "Notification locale", f"{NOTIF_TYPE}  "
-                 + {"overlay": "(overlay coin haut-droit)",
-                    "sound":   "(bip audio systeme)",
-                    "windows": "(toast Windows)"}
-                 .get(NOTIF_TYPE, ""))
         console.print()
 
         t2 = Text()
-        t2.append("  Choix (1-4) ou ", style="dim")
+        t2.append("  Choix (1-3) ou ", style="dim")
         t2.append("[Entrée]", style="bold")
         t2.append(" pour quitter : ", style="dim")
         console.print(t2, end="")
@@ -1302,8 +1185,6 @@ def config_menu():
                 WEBHOOK_URL = val
                 _save_variable("WEBHOOK_URL", f'WEBHOOK_URL  = "{WEBHOOK_URL}"', r'^WEBHOOK_URL\s*=\s*"[^"]*"')
                 ln_ok("Webhook mis à jour.")
-        elif choix == "4":
-            _menu_notif()
         else:
             ln_warn("Choix invalide.")
 
@@ -1318,37 +1199,6 @@ def _cfg_row(key: str, label: str, value: str):
     t.append(value, style="bold white")
     console.print(t)
 
-
-def _menu_notif():
-    """Sous-menu pour choisir le type de notification."""
-    global NOTIF_TYPE
-    console.print()
-    notif_options = [
-        ("1", "overlay",  "Overlay coin haut-droit  (recommandé)"),
-        ("2", "sound",    "Bip audio système Windows"),
-        ("3", "windows",  "Toast natif Windows"),
-    ]
-    for key, val, desc in notif_options:
-        active = " ◀ actuel" if val == NOTIF_TYPE else ""
-        style = "bold cyan" if val == NOTIF_TYPE else "dim"
-        t = Text()
-        t.append(f"  [{key}] ", style="bold cyan")
-        t.append(desc, style=style)
-        t.append(active, style="bold green")
-        console.print(t)
-    console.print()
-    console.print("  Choix (1-3) ou Entrée pour annuler : ", end="")
-    choix = input().strip()
-    mapping = {"1": "overlay", "2": "sound", "3": "windows"}
-    if choix in mapping:
-        globals()["NOTIF_TYPE"] = mapping[choix]
-        NOTIF_TYPE = globals()["NOTIF_TYPE"]
-        _save_variable("NOTIF_TYPE", f'NOTIF_TYPE   = "{NOTIF_TYPE}"', r'^NOTIF_TYPE\s*=\s*"[^"]*"')
-        ln_ok(f"Notification mise à jour : {NOTIF_TYPE}")
-        # Test immédiat
-        console.print("  [dim]Test de la notification...[/]")
-        Thread(target=notify_clip_sent, args=("Test", 2.4, 20), daemon=True).start()
-        time.sleep(0.5)
 
 
 def _save_variable(name: str, new_line: str, pattern: str):
