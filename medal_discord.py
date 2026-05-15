@@ -298,6 +298,8 @@ def print_stats():
 
 # ── File d'attente ────────────────────────────────────────────────────────────────
 clip_queue = Queue()
+processed_files = set()  # Anti-doublon : fichiers déjà en queue
+processed_lock = Lock()
 
 def worker():
     while True:
@@ -668,22 +670,8 @@ PHRASES_CLIP = [
 
 
 def notify_clip_sent(game: str, size_mb: float, duration: float):
-    """Joue une petite melodie douce pour signaler qu'un clip a ete envoye."""
-    try:
-        import winsound
-        import time
-        # Mélodie légère et agréable à l'oreille
-        # Fréquences plus basses pour moins agresser
-        notes = [
-            (659, 50),   # Mi
-            (784, 50),   # Sol
-            (880, 80),   # La - note finale un peu plus longue
-        ]
-        for freq, dur in notes:
-            winsound.Beep(freq, dur)
-            time.sleep(0.04)  # Petite pause entre les notes
-    except Exception as e:
-        log_write("WARN", f"Notification son echouee : {e}")
+    """Ancien système - pas utilisé. La mélodie se joue à la DÉTECTION seulement."""
+    pass
 
 
 def _notif_detected():
@@ -691,16 +679,15 @@ def _notif_detected():
     try:
         import winsound
         import time
-        # Mélodie douce avec pauses entre les notes
-        # Fréquences basses + courtes durées = moins agressif pour les oreilles
+        # Trois notes douces et rapides - pas agressif
         notes = [
-            (659, 60),   # Mi - 60ms
-            (784, 60),   # Sol - 60ms
-            (988, 100),  # Si - 100ms
+            (659, 100),   # Mi - doux
+            (784, 100),   # Sol - mid-range
+            (988, 150),   # Si - final
         ]
         for freq, dur in notes:
             winsound.Beep(freq, dur)
-            time.sleep(0.05)  # Pause de 50ms entre les notes
+            time.sleep(0.05)  # Petite pause entre les notes
     except Exception:
         pass
 
@@ -711,10 +698,17 @@ class MedalHandler(FileSystemEventHandler):
         p = event.src_path.lower()
         if "_discord" in p: return
         if p.endswith((".mp4", ".mov", ".avi", ".mkv")):
+            # Anti-doublon : vérifier si le fichier est déjà en attente
+            with processed_lock:
+                if event.src_path in processed_files:
+                    return
+                processed_files.add(event.src_path)
+            
             clip_queue.put(event.src_path)
             with stats_lock:
                 stats["queue"] = clip_queue.qsize()
             ln_warn(f"Clip détecté : {os.path.basename(event.src_path)}")
+            # MÉLODIE SEULEMENT À LA DÉTECTION (pas après envoi)
             Thread(target=_notif_detected, daemon=True).start()
 
 # ── Desinstalleur ─────────────────────────────────────────────────────────────────
