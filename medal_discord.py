@@ -98,7 +98,7 @@ CLIP_DUREE     = 20
 RETRY_UPLOAD   = 3
 
 # ── Auto-update depuis GitHub ─────────────────────────────────────────────────────
-VERSION     = "5.2"
+VERSION     = "5.3"
 PATCH_NOTES = [
     "v5.2 : Melodie douce a la detection du clip, plus rien a l'envoi",
     "v5.2 : Volume reduit — notes plus courtes",
@@ -210,7 +210,6 @@ def check_update():
             _folder     = FOLDER
             _pseudo     = PSEUDO
             _ffmpeg     = FFMPEG_PATH
-            _notif      = NOTIF_TYPE
             new_script = r.text
             # Substitution des variables utilisateur - remplacement ligne par ligne
             # pour eviter tout conflit regex sur le code source lui-meme
@@ -231,9 +230,6 @@ def check_update():
                 elif _s.startswith("FFMPEG" + "_PATH") and "=" in _s and "r" + _q in _s:
                     _indent = _ln[: len(_ln) - len(_ln.lstrip())]
                     _lines_out.append(_indent + "FFMPEG" + "_PATH  = r" + _q + _ffmpeg + _q + chr(10))
-                elif _s.startswith("NOTIF" + "_TYPE") and "=" in _s:
-                    _indent = _ln[: len(_ln) - len(_ln.lstrip())]
-                    _lines_out.append(_indent + "NOTIF" + "_TYPE   = " + _q + _notif + _q + chr(10))
                 else:
                     _lines_out.append(_ln)
             # ─────────────────────────────────────────────────────────────
