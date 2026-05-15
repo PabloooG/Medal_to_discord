@@ -99,20 +99,28 @@ CLIP_DUREE     = 20
 RETRY_UPLOAD   = 3
 
 # ── Auto-update depuis GitHub ─────────────────────────────────────────────────────
-VERSION     = "3.4"
+VERSION     = "3.13"
 PATCH_NOTES = [
+    "v3.13 : Fix sauvegarde variables config — regex ancre en debut de ligne uniquement",
+    "v3.12 : Menu config wipe la console a chaque affichage — plus d'historique",
+    "v3.11 : Raccourcis C/H/Q affiches au demarrage avant passage en tray",
+    "v3.10 : Restauration tray ne wipe plus la console — infos de demarrage preservees",
+    "v3.9 : Fix critique mise a jour — script complet preserve (plus d'IndentationError)",
+    "v3.8 : Wipe console apres config/tray mais garde l'affichage complet au demarrage",
+    "v3.7 : Console effacee automatiquement apres config ou restauration tray",
+    "v3.6 : Test mise a jour automatique",
+    "v3.5 : Demarrage direct en tray — plus de double fenetre possible",
+    "v3.5 : Fix NOTIF_TYPE toujours sauvegarde comme windows dans le menu config",
+    "v3.5 : Fix PSEUDO toujours sauvegarde comme Pablo_G peu importe la valeur saisie",
+    "v3.5 : Fix SyntaxError lors du changement de mode de notification",
     "v3.4 : Fenetre visible au demarrage manuel, cachee seulement si lancement automatique",
     "v3.4 : [H] cache la console immediatement puis affiche le tray",
     "v3.4 : Anti-doublon tray — [H] ignore si tray deja actif",
     "v3.3 : Demarrage fantome total — aucun tray, aucune barre des taches. Tray uniquement sur [H]",
     "v3.3 : Correction unicodeescape dans check_update et config_menu (chemins Windows hardcodes)",
-    "v3.3 : Auto-update reactivee (avait ete desactivee temporairement en v3.2)",
     "v3.2 : Touche [H] minimise dans le system tray avec icone (clic droit pour restaurer ou quitter)",
     "v3.1 : Correction SyntaxError unicodeescape lors des mises a jour (chemins Windows)",
     "v3.0 : Banque de 15 phrases droles apres chaque clip + 15 phrases pour la touche H",
-    "v2.9 : Touche [H] pour cacher la fenetre + notification au demarrage",
-    "v2.8 : Correction definitive bad escape backslash (lambda re.sub)",
-    "v2.6 : Notification locale apres chaque clip envoye",
 ]
 GITHUB_RAW  = "https://raw.githubusercontent.com/PabloooG/Medal_to_discord/main/medal_discord.py"
 
@@ -206,8 +214,6 @@ def check_update():
                 _s = _ln.lstrip()
                 if _s.startswith("WEBHOOK" + "_URL") and "=" in _s and not _ln.startswith(" "):
                     _lines_out.append("WEBHOOK_URL  = " + _q + _webhook + _q + chr(10))
-                elif _s.startswith("FOLDER") and "=" in _s and not _s.startswith("FOLDER"):
-                    _lines_out.append(_ln)
                 elif _s.startswith("FOL" + "DER") and "=" in _s and "r" + _q in _s:
                     _indent = _ln[: len(_ln) - len(_ln.lstrip())]
                     _lines_out.append(_indent + "FOLDER       = r" + _q + _folder + _q + chr(10))
@@ -219,10 +225,13 @@ def check_update():
                     _lines_out.append(_indent + "FFMPEG_PATH  = r" + _q + _ffmpeg + _q + chr(10))
                 elif _s.startswith("NOTIF" + "_TYPE") and "=" in _s:
                     _indent = _ln[: len(_ln) - len(_ln.lstrip())]
-                    _lines_out.append(_indent + "NOTIF_TYPE   = "windows"".join(_lines_out)
+                    _lines_out.append(_indent + "NOTIF_TYPE   = " + _q + _notif + _q + chr(10))
+                else:
+                    _lines_out.append(_ln)
             # ─────────────────────────────────────────────────────────────
+            final_script = "".join(_lines_out)
             with open(script_path, "w", encoding="utf-8") as f:
-                f.write(new_script)
+                f.write(final_script)
             ln_ok(f"Mise a jour v{latest} telechargee !")
             flag_path = script_path + ".updated"
             with open(flag_path, "w", encoding="utf-8") as _f:
@@ -927,18 +936,13 @@ def main():
     observer.schedule(MedalHandler(), FOLDER, recursive=True)
     observer.start()
 
+    # Afficher les raccourcis avant de passer en tray
     if not SILENT:
-        active = Text()
-        active.append("▶ ", style="bold green")
-        active.append("Surveillance active — nouveaux clips seulement...", style="bold green")
-        console.print(active)
         _print_shortcuts()
 
-    # Démarrage fantôme : cache uniquement si lancé en mode silencieux (démarrage auto)
-    if SILENT:
-        _ghost_hide()
-
+    # Démarrage toujours en tray — évite toute double fenetre
     Thread(target=notify_startup, daemon=True).start()
+    _hide_window()
 
     try:
         while True:
@@ -953,13 +957,7 @@ def main():
                     observer = Observer()
                     observer.schedule(MedalHandler(), FOLDER, recursive=True)
                     observer.start()
-                    if not SILENT:
-                        separator()
-                        active2 = Text()
-                        active2.append("▶ ", style="bold green")
-                        active2.append("Surveillance reprise...", style="bold green")
-                        console.print(active2)
-                        _print_shortcuts()
+                    _clear_and_redraw()
                 elif key == "h":
                     _hide_window()
                 elif key == "q" or key == "\x03":
@@ -991,6 +989,18 @@ def _getch() -> str:
         return msvcrt.getwch()
     except Exception:
         return ""
+
+def _clear_and_redraw():
+    """Efface la console et reaffiche l'interface de base."""
+    if SILENT: return
+    import os as _os
+    _os.system("cls")
+    print_header()
+    active_txt = Text()
+    active_txt.append("▶ ", style="bold green")
+    active_txt.append("Surveillance active — nouveaux clips seulement...", style="bold green")
+    console.print(active_txt)
+    _print_shortcuts()
 
 def _print_shortcuts():
     if SILENT: return
@@ -1267,8 +1277,8 @@ def config_menu():
             console.print("  Nouveau pseudo : ", end="")
             val = input().strip()
             if val:
-                PSEUDO       = "Pablo_G"
-                _save_variable("PSEUDO", f'PSEUDO       = "{PSEUDO}"', r'PSEUDO\s*=\s*"[^"]*"')
+                PSEUDO       = val
+                _save_variable("PSEUDO", f'PSEUDO       = "{PSEUDO}"', r'^PSEUDO\s*=\s*"[^"]*"')
                 ln_ok(f"Pseudo mis à jour : {PSEUDO}")
         elif choix == "2":
             console.print(f"  Dossier actuel : [bold]{FOLDER}[/]  (Entrée pour garder)")
@@ -1279,7 +1289,7 @@ def config_menu():
                     ln_err(f"Dossier introuvable : {val}")
                 else:
                     FOLDER = val
-                    _save_variable("FOLDER", 'FOLDER       = r"' + FOLDER + '"', r'FOLDER\s*=\s*r"[^"]*"')
+                    _save_variable("FOLDER", 'FOLDER       = r"' + FOLDER + '"', r'^FOLDER\s*=\s*r"[^"]*"')
                     ln_ok(f"Dossier mis à jour : {FOLDER}")
         elif choix == "3":
             console.print("  Webhook actuel (Entrée pour garder) :")
@@ -1288,7 +1298,7 @@ def config_menu():
             val = input().strip()
             if val:
                 WEBHOOK_URL = val
-                _save_variable("WEBHOOK_URL", f'WEBHOOK_URL  = "{WEBHOOK_URL}"', r'WEBHOOK_URL\s*=\s*"[^"]*"')
+                _save_variable("WEBHOOK_URL", f'WEBHOOK_URL  = "{WEBHOOK_URL}"', r'^WEBHOOK_URL\s*=\s*"[^"]*"')
                 ln_ok("Webhook mis à jour.")
         elif choix == "4":
             _menu_notif()
@@ -1329,8 +1339,8 @@ def _menu_notif():
     choix = input().strip()
     mapping = {"1": "overlay", "2": "sound", "3": "windows"}
     if choix in mapping:
-        NOTIF_TYPE   = "windows"
-        _save_variable("NOTIF_TYPE", f'NOTIF_TYPE   = "windows"', r'NOTIF_TYPE\s*=\s*"[^"]*"')
+        NOTIF_TYPE   = mapping[choix]
+        _save_variable("NOTIF_TYPE", f'NOTIF_TYPE   = "{NOTIF_TYPE}"', r'^NOTIF_TYPE\s*=\s*"[^"]*"')
         ln_ok(f"Notification mise à jour : {NOTIF_TYPE}")
         # Test immédiat
         console.print("  [dim]Test de la notification...[/]")
@@ -1346,7 +1356,7 @@ def _save_variable(name: str, new_line: str, pattern: str):
             content = f.read()
         import re as _re
         _nl = new_line
-        new_content = _re.sub(pattern, lambda m: _nl, content)
+        new_content = _re.sub(pattern, lambda m: _nl, content, flags=_re.MULTILINE)
         with open(script_path, "w", encoding="utf-8") as f:
             f.write(new_content)
         log_write("INFO", f"{name} sauvegarde dans le script.")
