@@ -928,7 +928,18 @@ def main():
     if errors:
         if not SILENT:
             input("\nEntrée pour fermer...")
-        return
+            return
+        else:
+            for tentative in range(3):
+                time.sleep(10)  # 10s entre chaque essai
+                _resolve_ffmpeg()
+                errors = not os.path.isfile(FFMPEG_PATH) or not os.path.isdir(FOLDER)
+                if not errors:
+                    log_write("INFO", f"OK au bout de {tentative + 1} essai(s).")
+                    break
+            if errors:
+                log_write("ERR ", "Démarrage abandonné après 3 essais.")
+                return
 
     cleanup_leftover_tmps()
 
