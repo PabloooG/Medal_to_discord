@@ -8,6 +8,7 @@ import requests
 import subprocess
 import os
 import re
+import random
 import glob
 import atexit
 import sys
@@ -98,8 +99,9 @@ CLIP_DUREE     = 20
 RETRY_UPLOAD   = 3
 
 # ── Auto-update depuis GitHub ─────────────────────────────────────────────────────
-VERSION     = "3.15"
+VERSION     = "3.16"
 PATCH_NOTES = [
+    "v3.16 : Notification Windows toast sur [H] avec phrase drole",
     "v3.15 : Fix SyntaxWarning Python 3.12 sur regex FOLDER dans _save_variable",
     "v3.14 : Suppression de toutes les notifications locales (toast, overlay, son)",
     "v3.13 : Fix sauvegarde variables config — regex ancre en debut de ligne uniquement",
@@ -637,6 +639,25 @@ def process_clip(file_path: str):
 
     with stats_lock: stats["traites"] += 1
 
+PHRASES_HIDE = [
+    "Cache mais toujours la. Comme un ninja.",
+    "Mode fantome active. Tes clips sont en securite.",
+    "Invisible mais sur le coup.",
+    "Tu me vois plus mais je te vois.",
+    "Disparu des radars. Pas des clips.",
+    "Mode discret ON. Tes highlights sont entre de bonnes mains.",
+    "Je suis la, t'inquiete. Comme ton instinct de gamer.",
+    "Fenetre fermee. Concentration maximale.",
+    "Je suis dans les murs maintenant.",
+    "Meme ta mere sait pas que je tourne.",
+    "Cache comme tes skills au debut de la partie.",
+    "J'existe toujours. Philosophiquement parlant.",
+    "Je surveille tes clips depuis les ombres.",
+    "Tu peux pas m'arreter. T'as meme pas essaye.",
+    "Processus 4327 te salue bien.",
+]
+
+
 # ── Watchdog ──────────────────────────────────────────────────────────────────────
 class MedalHandler(FileSystemEventHandler):
     def on_created(self, event):
@@ -932,6 +953,28 @@ def _hide_window():
             _ct.windll.user32.ShowWindow(_hwnd, 0)
     except Exception:
         pass
+    # Notification Windows au moment du masquage [H]
+    try:
+        _phrase = random.choice(PHRASES_HIDE)
+        _title  = "Medal -> Discord  [cache]"
+        _ps_cmd = (
+            "Add-Type -AssemblyName System.Windows.Forms;"
+            "[System.Windows.Forms.Application]::EnableVisualStyles();"
+            "$n=New-Object System.Windows.Forms.NotifyIcon;"
+            "$n.Icon=[System.Drawing.SystemIcons]::Application;"
+            "$n.Visible=$true;"
+            f"$n.ShowBalloonTip(3000,'{_title}','{_phrase}',"
+            "[System.Windows.Forms.ToolTipIcon]::Info);"
+            "Start-Sleep -Milliseconds 3500;"
+            "$n.Dispose()"
+        )
+        import subprocess as _subp
+        _subp.Popen(
+            ["powershell", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-Command", _ps_cmd],
+            creationflags=subprocess.CREATE_NO_WINDOW
+        )
+    except Exception:
+        pass
     Thread(target=_run_tray, daemon=True).start()
 
 def _run_tray():
@@ -993,7 +1036,7 @@ def _run_tray():
             icon.stop()
             os._exit(0)
 
-        phrase = "Surveillance active en arriere-plan."
+        phrase = random.choice(PHRASES_HIDE)
         menu = pystray.Menu(
             pystray.MenuItem("Medal -> Discord  actif", None, enabled=False),
             pystray.MenuItem(f"<< {phrase} >>", None, enabled=False),
