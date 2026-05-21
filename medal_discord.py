@@ -221,8 +221,8 @@ def check_update():
             # ── Preservation des variables du client ──────────────────────
             import re as _re
             _webhook    = WEBHOOK_URL
-            _webhook2   = WEBHOOK_URL2
-            _webhook3   = WEBHOOK_URL3
+            _webhook2   = globals().get("WEBHOOK_URL2", "")
+            _webhook3   = globals().get("WEBHOOK_URL3", "")
             _folder     = FOLDER
             _pseudo     = PSEUDO
             _ffmpeg     = FFMPEG_PATH
