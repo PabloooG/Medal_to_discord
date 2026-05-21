@@ -99,8 +99,9 @@ CLIP_DUREE     = 20
 RETRY_UPLOAD   = 3
 
 # ── Auto-update depuis GitHub ─────────────────────────────────────────────────────
-VERSION     = "3.16"
+VERSION     = "3.17"
 PATCH_NOTES = [
+    "v3.17 : Fix definitif SyntaxWarning Python 3.12 sur tous les patterns regex",
     "v3.16 : Notification Windows toast sur [H] avec phrase drole",
     "v3.15 : Fix SyntaxWarning Python 3.12 sur regex FOLDER dans _save_variable",
     "v3.14 : Suppression de toutes les notifications locales (toast, overlay, son)",
@@ -1090,7 +1091,8 @@ def config_menu():
             val = input().strip()
             if val:
                 PSEUDO       = val
-                _save_variable("PSEUDO", f'PSEUDO       = "{PSEUDO}"', r'^PSEUDO\s*=\s*"[^"]*"')
+                _pat_pseudo = '^PSEUDO\\s*=\\s*"[^"]*"'
+                _save_variable("PSEUDO", f'PSEUDO       = "{PSEUDO}"', _pat_pseudo)
                 ln_ok(f"Pseudo mis à jour : {PSEUDO}")
         elif choix == "2":
             console.print(f"  Dossier actuel : [bold]{FOLDER}[/]  (Entrée pour garder)")
@@ -1102,7 +1104,8 @@ def config_menu():
                 else:
                     FOLDER = val
                     _pat = '^FOLDER\\s*=\\s*r"[^"]*"'
-                    _save_variable("FOLDER", 'FOLDER       = r"' + FOLDER + '"', _pat)
+                    _folder_escaped = FOLDER.replace('\\', '\\\\')
+                    _save_variable("FOLDER", 'FOLDER       = r"' + _folder_escaped + '"', _pat)
                     ln_ok(f"Dossier mis à jour : {FOLDER}")
         elif choix == "3":
             console.print("  Webhook actuel (Entrée pour garder) :")
@@ -1111,7 +1114,8 @@ def config_menu():
             val = input().strip()
             if val:
                 WEBHOOK_URL = val
-                _save_variable("WEBHOOK_URL", f'WEBHOOK_URL  = "{WEBHOOK_URL}"', r'^WEBHOOK_URL\s*=\s*"[^"]*"')
+                _pat_wh = '^WEBHOOK_URL\\s*=\\s*"[^"]*"'
+                _save_variable("WEBHOOK_URL", f'WEBHOOK_URL  = "{WEBHOOK_URL}"', _pat_wh)
                 ln_ok("Webhook mis à jour.")
         else:
             ln_warn("Choix invalide.")
