@@ -66,6 +66,8 @@ def separator():
 
 # ── CONFIGURATION ────────────────────────────────────────────────────────────────
 WEBHOOK_URL  = "https://discord.com/api/webhooks/1499530486928904312/DvR9lA-bgAXE4omeyDYMP1VHreXcUjD50lhzlVvL5Xei2qmJiJkUDRqfQHV3FYAwD1e1"
+WEBHOOK_URL2 = ""
+WEBHOOK_URL3 = ""
 FOLDER       = r"F:\Medal\Clips"
 FFMPEG_PATH  = r"C:\Users\j-phi\Desktop\Medal_to_Discord\ffmpeg\bin\ffmpeg.exe"
 FFPROBE_PATH = FFMPEG_PATH.replace("ffmpeg.exe", "ffprobe.exe")
@@ -92,6 +94,10 @@ def _resolve_ffmpeg():
         FFPROBE_PATH = found.replace("ffmpeg.exe", "ffprobe.exe")
 
 PSEUDO       = "Pablo_G"
+
+def get_active_webhooks() -> list:
+    """Retourne la liste des webhooks non-vides dans l'ordre."""
+    return [w for w in [WEBHOOK_URL, WEBHOOK_URL2, WEBHOOK_URL3] if w.strip()]
 LIMIT_MB       = 10
 MARGE_SECURITE = 0.95
 AUDIO_KBPS     = 128
@@ -99,8 +105,9 @@ CLIP_DUREE     = 20
 RETRY_UPLOAD   = 3
 
 # ── Auto-update depuis GitHub ─────────────────────────────────────────────────────
-VERSION     = "3.17"
+VERSION     = "3.18"
 PATCH_NOTES = [
+    "v3.18 : Multi-webhook (3 salons Discord), watchdog message Discord si F: absent, tray Ouvrir le log",
     "v3.17 : Fix definitif SyntaxWarning Python 3.12 sur tous les patterns regex",
     "v3.16 : Notification Windows toast sur [H] avec phrase drole",
     "v3.15 : Fix SyntaxWarning Python 3.12 sur regex FOLDER dans _save_variable",
@@ -141,7 +148,11 @@ def notify_update_discord(old_version: str, new_version: str, patch_notes: list)
         lines.append("")
         lines.append("⏭️ Prochaine vérif au redémarrage...")
         msg = "\n".join(lines)
-        requests.post(WEBHOOK_URL, json={"content": msg}, timeout=10)
+        for wh in get_active_webhooks():
+            try:
+                requests.post(wh, json={"content": msg}, timeout=10)
+            except Exception:
+                pass
     except Exception:
         pass
 
@@ -155,7 +166,11 @@ def notify_error_discord(old_version: str, new_version: str, error_msg: str):
         lines.append("⚠️ **Erreur**")
         lines.append(f"  ▸ {error_msg}")
         msg = "\n".join(lines)
-        requests.post(WEBHOOK_URL, json={"content": msg}, timeout=10)
+        for wh in get_active_webhooks():
+            try:
+                requests.post(wh, json={"content": msg}, timeout=10)
+            except Exception:
+                pass
     except Exception:
         pass
 
@@ -205,6 +220,8 @@ def check_update():
             # ── Preservation des variables du client ──────────────────────
             import re as _re
             _webhook    = WEBHOOK_URL
+            _webhook2   = WEBHOOK_URL2
+            _webhook3   = WEBHOOK_URL3
             _folder     = FOLDER
             _pseudo     = PSEUDO
             _ffmpeg     = FFMPEG_PATH
@@ -215,7 +232,11 @@ def check_update():
             _lines_out = []
             for _ln in new_script.splitlines(keepends=True):
                 _s = _ln.lstrip()
-                if _s.startswith("WEBHOOK" + "_URL") and "=" in _s and not _ln.startswith(" "):
+                if _s.startswith("WEBHOOK" + "_URL2") and "=" in _s and not _ln.startswith(" "):
+                    _lines_out.append("WEBHOOK_URL2 = " + _q + _webhook2 + _q + chr(10))
+                elif _s.startswith("WEBHOOK" + "_URL3") and "=" in _s and not _ln.startswith(" "):
+                    _lines_out.append("WEBHOOK_URL3 = " + _q + _webhook3 + _q + chr(10))
+                elif _s.startswith("WEBHOOK" + "_URL") and "=" in _s and not _ln.startswith(" "):
                     _lines_out.append("WEBHOOK_URL  = " + _q + _webhook + _q + chr(10))
                 elif _s.startswith("FOL" + "DER") and "=" in _s and "r" + _q in _s:
                     _indent = _ln[: len(_ln) - len(_ln.lstrip())]
@@ -474,61 +495,70 @@ def build_discord_message(game: str, size_mb: float,
     )
 
 def upload_discord(result_path: str, message: str) -> object:
-    if not SILENT:
-        console.print()
-        console.print("  [dim]envoi Discord...[/]")
+    webhooks = get_active_webhooks()
+    last_resp = None
 
-    for attempt in range(1, RETRY_UPLOAD + 1):
-        upload_done   = [False]
-        result_holder = [None]
-
-        def do_upload():
-            try:
-                with open(result_path, "rb") as f:
-                    r = requests.post(
-                        WEBHOOK_URL,
-                        files={"file": (os.path.basename(result_path), f, "video/mp4")},
-                        data={"content": message},
-                        timeout=120,
-                    )
-                result_holder[0] = r
-            except Exception as e:
-                result_holder[0] = e
-            finally:
-                upload_done[0] = True
-
-        Thread(target=do_upload, daemon=True).start()
-
+    for wh_index, wh_url in enumerate(webhooks, start=1):
+        wh_label = f"webhook {wh_index}/{len(webhooks)}"
         if not SILENT:
-            with Progress(
-                TextColumn(f"  [dim]upload (tentative {attempt}/{RETRY_UPLOAD})[/]"),
-                BarColumn(bar_width=46, style="blue", complete_style="cyan"),
-                TextColumn(" {task.percentage:>3.0f}%", style="bold cyan"),
-                console=console,
-                transient=False,
-            ) as prog:
-                task = prog.add_task("", total=100)
-                pct  = 0
+            console.print()
+            console.print(f"  [dim]envoi Discord ({wh_label})...[/]")
+
+        for attempt in range(1, RETRY_UPLOAD + 1):
+            upload_done   = [False]
+            result_holder = [None]
+
+            def do_upload(url=wh_url):
+                try:
+                    with open(result_path, "rb") as f:
+                        r = requests.post(
+                            url,
+                            files={"file": (os.path.basename(result_path), f, "video/mp4")},
+                            data={"content": message},
+                            timeout=120,
+                        )
+                    result_holder[0] = r
+                except Exception as e:
+                    result_holder[0] = e
+                finally:
+                    upload_done[0] = True
+
+            Thread(target=do_upload, daemon=True).start()
+
+            if not SILENT:
+                with Progress(
+                    TextColumn(f"  [dim]upload ({wh_label} — tentative {attempt}/{RETRY_UPLOAD})[/]"),
+                    BarColumn(bar_width=40, style="blue", complete_style="cyan"),
+                    TextColumn(" {task.percentage:>3.0f}%", style="bold cyan"),
+                    console=console,
+                    transient=False,
+                ) as prog:
+                    task = prog.add_task("", total=100)
+                    pct  = 0
+                    while not upload_done[0]:
+                        if pct < 90: pct = min(pct + 2, 90)
+                        prog.update(task, completed=pct)
+                        time.sleep(0.25)
+                    prog.update(task, completed=100)
+            else:
                 while not upload_done[0]:
-                    if pct < 90: pct = min(pct + 2, 90)
-                    prog.update(task, completed=pct)
-                    time.sleep(0.25)
-                prog.update(task, completed=100)
+                    time.sleep(0.5)
+
+            resp = result_holder[0]
+            if isinstance(resp, requests.Response) and resp.status_code in (200, 201):
+                last_resp = resp
+                break  # succès pour ce webhook, passer au suivant
+            if isinstance(resp, requests.Response) and resp.status_code == 413:
+                last_resp = resp
+                break  # fichier trop lourd, inutile de retry
+
+            wait = 2 ** attempt
+            ln_warn(f"({wh_label}) Tentative {attempt} échouée ({resp}) — retry dans {wait}s...")
+            time.sleep(wait)
         else:
-            while not upload_done[0]:
-                time.sleep(0.5)
+            last_resp = resp  # dernier résultat après épuisement des essais
 
-        resp = result_holder[0]
-        if isinstance(resp, requests.Response) and resp.status_code in (200, 201):
-            return resp
-        if isinstance(resp, requests.Response) and resp.status_code == 413:
-            return resp
-
-        wait = 2 ** attempt
-        ln_warn(f"Tentative {attempt} échouée ({resp}) — retry dans {wait}s...")
-        time.sleep(wait)
-
-    return resp
+    return last_resp
 
 # ── Traitement principal ──────────────────────────────────────────────────────────
 def process_clip(file_path: str):
@@ -808,6 +838,33 @@ def main():
                     break
             if errors:
                 log_write("ERR ", "Démarrage abandonné après 3 essais.")
+                # Notifier Discord que le dossier Medal est inaccessible
+                try:
+                    missing = []
+                    if not os.path.isfile(FFMPEG_PATH):
+                        missing.append(f"FFmpeg introuvable : `{FFMPEG_PATH}`")
+                    if not os.path.isdir(FOLDER):
+                        missing.append(f"Dossier Medal introuvable : `{FOLDER}`")
+                    msg_lines = [
+                        f"⚠️ **Script non démarré**  v{VERSION}",
+                        f"👤 {PSEUDO}",
+                        "",
+                        "❌ **Ressource(s) manquante(s) après 3 tentatives (×10s)**",
+                    ]
+                    for m in missing:
+                        msg_lines.append(f"  ▸ {m}")
+                    msg_lines += [
+                        "",
+                        "💡 Vérifie que le disque F: est bien monté et relance le script.",
+                    ]
+                    msg = "\n".join(msg_lines)
+                    for wh in get_active_webhooks():
+                        try:
+                            requests.post(wh, json={"content": msg}, timeout=10)
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
                 return
 
     cleanup_leftover_tmps()
@@ -1037,12 +1094,20 @@ def _run_tray():
             icon.stop()
             os._exit(0)
 
+        def on_open_log(icon, item):
+            try:
+                os.startfile(LOG_FILE)
+            except Exception:
+                pass
+
         phrase = random.choice(PHRASES_HIDE)
         menu = pystray.Menu(
             pystray.MenuItem("Medal -> Discord  actif", None, enabled=False),
             pystray.MenuItem(f"<< {phrase} >>", None, enabled=False),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem("Restaurer la fenetre  [H]", on_restore),
+            pystray.MenuItem("Ouvrir le log", on_open_log),
+            pystray.Menu.SEPARATOR,
             pystray.MenuItem("Quitter", on_quit),
         )
         icon = pystray.Icon("Medal->Discord", img, "Medal -> Discord", menu)
@@ -1059,7 +1124,7 @@ def config_menu():
     """Menu interactif pour modifier les variables sans réinstaller."""
     if SILENT: return
 
-    global WEBHOOK_URL, FOLDER, PSEUDO, FFMPEG_PATH, FFPROBE_PATH
+    global WEBHOOK_URL, WEBHOOK_URL2, WEBHOOK_URL3, FOLDER, PSEUDO, FFMPEG_PATH, FFPROBE_PATH
 
     while True:
         separator()
@@ -1072,11 +1137,21 @@ def config_menu():
         # Affiche les valeurs actuelles
         _cfg_row("1", "Pseudo Discord",      PSEUDO)
         _cfg_row("2", "Dossier clips Medal", FOLDER)
-        _cfg_row("3", "Webhook Discord",     WEBHOOK_URL[:52] + "..." if len(WEBHOOK_URL) > 52 else WEBHOOK_URL)
+
+        def _wh_display(url: str, label: str):
+            if url.strip():
+                short = url[:52] + "..." if len(url) > 52 else url
+            else:
+                short = "[dim](non configuré)[/dim]"
+            _cfg_row(label, f"Webhook {label}", short)
+
+        _wh_display(WEBHOOK_URL,  "3")
+        _wh_display(WEBHOOK_URL2, "4")
+        _wh_display(WEBHOOK_URL3, "5")
         console.print()
 
         t2 = Text()
-        t2.append("  Choix (1-4) ou ", style="dim")
+        t2.append("  Choix (1-5) ou ", style="dim")
         t2.append("[Entrée]", style="bold")
         t2.append(" pour quitter : ", style="dim")
         console.print(t2, end="")
@@ -1107,16 +1182,44 @@ def config_menu():
                     _folder_escaped = FOLDER.replace('\\', '\\\\')
                     _save_variable("FOLDER", 'FOLDER       = r"' + _folder_escaped + '"', _pat)
                     ln_ok(f"Dossier mis à jour : {FOLDER}")
-        elif choix == "3":
-            console.print("  Webhook actuel (Entrée pour garder) :")
-            console.print(f"  [dim]{WEBHOOK_URL}[/]")
-            console.print("  Nouveau webhook : ", end="")
-            val = input().strip()
-            if val:
-                WEBHOOK_URL = val
-                _pat_wh = '^WEBHOOK_URL\\s*=\\s*"[^"]*"'
-                _save_variable("WEBHOOK_URL", f'WEBHOOK_URL  = "{WEBHOOK_URL}"', _pat_wh)
-                ln_ok("Webhook mis à jour.")
+        elif choix in ("3", "4", "5"):
+            wh_num = int(choix)
+            wh_map = {3: ("WEBHOOK_URL",  WEBHOOK_URL),
+                      4: ("WEBHOOK_URL2", WEBHOOK_URL2),
+                      5: ("WEBHOOK_URL3", WEBHOOK_URL3)}
+            var_name, cur_val = wh_map[wh_num]
+            if cur_val.strip():
+                console.print(f"  Webhook #{wh_num - 2} actuel (Entrée pour garder) :")
+                console.print(f"  [dim]{cur_val}[/]")
+            else:
+                console.print(f"  Webhook #{wh_num - 2} (vide — laisser vide pour désactiver) :")
+            console.print("  Nouveau webhook (Entrée pour garder, espace+Entrée pour effacer) : ", end="")
+            val = input()
+            val_stripped = val.strip()
+            if val == " " or val_stripped == "":
+                if val == " ":
+                    # Effacer ce webhook
+                    new_val = ""
+                    if var_name == "WEBHOOK_URL":
+                        WEBHOOK_URL = ""
+                    elif var_name == "WEBHOOK_URL2":
+                        WEBHOOK_URL2 = ""
+                    else:
+                        WEBHOOK_URL3 = ""
+                    _pat_wh = f'^{var_name}\\s*=\\s*"[^"]*"'
+                    _save_variable(var_name, f'{var_name} = ""', _pat_wh)
+                    ln_ok(f"Webhook #{wh_num - 2} effacé.")
+                # sinon (Entrée vide) → garder sans changement
+            else:
+                if var_name == "WEBHOOK_URL":
+                    WEBHOOK_URL = val_stripped
+                elif var_name == "WEBHOOK_URL2":
+                    WEBHOOK_URL2 = val_stripped
+                else:
+                    WEBHOOK_URL3 = val_stripped
+                _pat_wh = f'^{var_name}\\s*=\\s*"[^"]*"'
+                _save_variable(var_name, f'{var_name} = "{val_stripped}"', _pat_wh)
+                ln_ok(f"Webhook #{wh_num - 2} mis à jour.")
         else:
             ln_warn("Choix invalide.")
 
@@ -1168,6 +1271,10 @@ if __name__ == "__main__":
             lines.append("")
             lines.append("🔧 Verifiez le fichier `medal_discord.log` pour plus de details.")
             msg = "\n".join(lines)
-            requests.post(WEBHOOK_URL, json={"content": msg}, timeout=10)
+            for wh in get_active_webhooks():
+                try:
+                    requests.post(wh, json={"content": msg}, timeout=10)
+                except Exception:
+                    pass
         except Exception:
             pass
