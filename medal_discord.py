@@ -98,6 +98,7 @@ PSEUDO       = "Pablo_G"
 def get_active_webhooks() -> list:
     """Retourne la liste des webhooks non-vides dans l'ordre."""
     return [w for w in [WEBHOOK_URL, WEBHOOK_URL2, WEBHOOK_URL3] if w.strip()]
+
 LIMIT_MB       = 10
 MARGE_SECURITE = 0.95
 AUDIO_KBPS     = 128
@@ -105,9 +106,9 @@ CLIP_DUREE     = 20
 RETRY_UPLOAD   = 3
 
 # ── Auto-update depuis GitHub ─────────────────────────────────────────────────────
-VERSION     = "3.18"
+VERSION     = "4.0"
 PATCH_NOTES = [
-    "v3.18 : Multi-webhook (3 salons Discord), watchdog message Discord si F: absent, tray Ouvrir le log",
+    "v4.0 : Multi-webhook (3 salons Discord), watchdog message Discord si F: absent, tray Ouvrir le log",
     "v3.17 : Fix definitif SyntaxWarning Python 3.12 sur tous les patterns regex",
     "v3.16 : Notification Windows toast sur [H] avec phrase drole",
     "v3.15 : Fix SyntaxWarning Python 3.12 sur regex FOLDER dans _save_variable",
@@ -556,7 +557,7 @@ def upload_discord(result_path: str, message: str) -> object:
             ln_warn(f"({wh_label}) Tentative {attempt} échouée ({resp}) — retry dans {wait}s...")
             time.sleep(wait)
         else:
-            last_resp = resp  # dernier résultat après épuisement des essais
+            last_resp = resp
 
     return last_resp
 
@@ -838,7 +839,6 @@ def main():
                     break
             if errors:
                 log_write("ERR ", "Démarrage abandonné après 3 essais.")
-                # Notifier Discord que le dossier Medal est inaccessible
                 try:
                     missing = []
                     if not os.path.isfile(FFMPEG_PATH):
@@ -1138,16 +1138,14 @@ def config_menu():
         _cfg_row("1", "Pseudo Discord",      PSEUDO)
         _cfg_row("2", "Dossier clips Medal", FOLDER)
 
-        def _wh_display(url: str, label: str):
-            if url.strip():
-                short = url[:52] + "..." if len(url) > 52 else url
-            else:
-                short = "[dim](non configuré)[/dim]"
-            _cfg_row(label, f"Webhook {label}", short)
+        def _wh_short(url: str) -> str:
+            if not url.strip():
+                return "(non configuré)"
+            return url[:52] + "..." if len(url) > 52 else url
 
-        _wh_display(WEBHOOK_URL,  "3")
-        _wh_display(WEBHOOK_URL2, "4")
-        _wh_display(WEBHOOK_URL3, "5")
+        _cfg_row("3", "Webhook Discord #1",  _wh_short(WEBHOOK_URL))
+        _cfg_row("4", "Webhook Discord #2",  _wh_short(WEBHOOK_URL2))
+        _cfg_row("5", "Webhook Discord #3",  _wh_short(WEBHOOK_URL3))
         console.print()
 
         t2 = Text()
@@ -1165,7 +1163,7 @@ def config_menu():
             console.print("  Nouveau pseudo : ", end="")
             val = input().strip()
             if val:
-                PSEUDO       = val
+                PSEUDO = val
                 _pat_pseudo = '^PSEUDO\\s*=\\s*"[^"]*"'
                 _save_variable("PSEUDO", f'PSEUDO       = "{PSEUDO}"', _pat_pseudo)
                 ln_ok(f"Pseudo mis à jour : {PSEUDO}")
@@ -1184,42 +1182,47 @@ def config_menu():
                     ln_ok(f"Dossier mis à jour : {FOLDER}")
         elif choix in ("3", "4", "5"):
             wh_num = int(choix)
-            wh_map = {3: ("WEBHOOK_URL",  WEBHOOK_URL),
-                      4: ("WEBHOOK_URL2", WEBHOOK_URL2),
-                      5: ("WEBHOOK_URL3", WEBHOOK_URL3)}
-            var_name, cur_val = wh_map[wh_num]
+            if wh_num == 3:
+                var_name, cur_val = "WEBHOOK_URL",  WEBHOOK_URL
+            elif wh_num == 4:
+                var_name, cur_val = "WEBHOOK_URL2", WEBHOOK_URL2
+            else:
+                var_name, cur_val = "WEBHOOK_URL3", WEBHOOK_URL3
+
+            num_label = wh_num - 2  # 1, 2 ou 3
             if cur_val.strip():
-                console.print(f"  Webhook #{wh_num - 2} actuel (Entrée pour garder) :")
+                console.print(f"  Webhook #{num_label} actuel :")
                 console.print(f"  [dim]{cur_val}[/]")
+                console.print("  Nouveau (Entrée pour garder, espace+Entrée pour effacer) : ", end="")
             else:
-                console.print(f"  Webhook #{wh_num - 2} (vide — laisser vide pour désactiver) :")
-            console.print("  Nouveau webhook (Entrée pour garder, espace+Entrée pour effacer) : ", end="")
-            val = input()
-            val_stripped = val.strip()
-            if val == " " or val_stripped == "":
-                if val == " ":
-                    # Effacer ce webhook
-                    new_val = ""
-                    if var_name == "WEBHOOK_URL":
-                        WEBHOOK_URL = ""
-                    elif var_name == "WEBHOOK_URL2":
-                        WEBHOOK_URL2 = ""
-                    else:
-                        WEBHOOK_URL3 = ""
-                    _pat_wh = f'^{var_name}\\s*=\\s*"[^"]*"'
-                    _save_variable(var_name, f'{var_name} = ""', _pat_wh)
-                    ln_ok(f"Webhook #{wh_num - 2} effacé.")
-                # sinon (Entrée vide) → garder sans changement
-            else:
+                console.print(f"  Webhook #{num_label} (vide — laisser vide pour désactiver)")
+                console.print("  Nouveau webhook : ", end="")
+
+            raw = input()
+            val = raw.strip()
+
+            if raw == " ":
+                # Effacer ce webhook
                 if var_name == "WEBHOOK_URL":
-                    WEBHOOK_URL = val_stripped
+                    WEBHOOK_URL = ""
                 elif var_name == "WEBHOOK_URL2":
-                    WEBHOOK_URL2 = val_stripped
+                    WEBHOOK_URL2 = ""
                 else:
-                    WEBHOOK_URL3 = val_stripped
+                    WEBHOOK_URL3 = ""
                 _pat_wh = f'^{var_name}\\s*=\\s*"[^"]*"'
-                _save_variable(var_name, f'{var_name} = "{val_stripped}"', _pat_wh)
-                ln_ok(f"Webhook #{wh_num - 2} mis à jour.")
+                _save_variable(var_name, f'{var_name} = ""', _pat_wh)
+                ln_ok(f"Webhook #{num_label} effacé.")
+            elif val:
+                if var_name == "WEBHOOK_URL":
+                    WEBHOOK_URL = val
+                elif var_name == "WEBHOOK_URL2":
+                    WEBHOOK_URL2 = val
+                else:
+                    WEBHOOK_URL3 = val
+                _pat_wh = f'^{var_name}\\s*=\\s*"[^"]*"'
+                _save_variable(var_name, f'{var_name} = "{val}"', _pat_wh)
+                ln_ok(f"Webhook #{num_label} mis à jour.")
+            # sinon Entrée vide → garder sans changement
         else:
             ln_warn("Choix invalide.")
 
@@ -1271,10 +1274,6 @@ if __name__ == "__main__":
             lines.append("")
             lines.append("🔧 Verifiez le fichier `medal_discord.log` pour plus de details.")
             msg = "\n".join(lines)
-            for wh in get_active_webhooks():
-                try:
-                    requests.post(wh, json={"content": msg}, timeout=10)
-                except Exception:
-                    pass
+            requests.post(WEBHOOK_URL, json={"content": msg}, timeout=10)
         except Exception:
             pass
