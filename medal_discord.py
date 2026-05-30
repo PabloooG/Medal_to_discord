@@ -40,8 +40,17 @@ def log_write(level: str, msg: str):
         pass
 
 # ── Détection mode silencieux ────────────────────────────────────────────────────
-# pythonw.exe n'a pas de console (sys.stdout est None)
-SILENT = sys.stdout is None
+# pythonw.exe : sys.stdout est None OU invalide (certaines versions Python/Windows)
+def _detect_silent():
+    if sys.stdout is None:
+        return True
+    try:
+        sys.stdout.write("")
+        sys.stdout.flush()
+        return False
+    except Exception:
+        return True
+SILENT = _detect_silent()
 
 if not SILENT:
     from rich.console import Console
@@ -106,8 +115,10 @@ CLIP_DUREE     = 20
 RETRY_UPLOAD   = 3
 
 # ── Auto-update depuis GitHub ─────────────────────────────────────────────────────
-VERSION     = "4.0"
+VERSION     = "4.1"
 PATCH_NOTES = [
+    "v4.1 : Fix demarrage fantome — Working Directory manquant dans Task Scheduler, detection SILENT robuste",
+    "v4.1 : Desinstalleur mis a jour — supprime la tache planifiee MedalToDiscord au lieu du .vbs obsolete",
     "v4.0 : Multi-webhook (3 salons Discord), watchdog message Discord si F: absent, tray Ouvrir le log",
     "v3.17 : Fix definitif SyntaxWarning Python 3.12 sur tous les patterns regex",
     "v3.16 : Notification Windows toast sur [H] avec phrase drole",
@@ -713,6 +724,7 @@ def create_uninstaller():
             "Microsoft", "Windows", "Start Menu",
             "Programs", "Startup", "Medal Discord.vbs"
         )
+        task_name = "MedalToDiscord"
         lines = [
             "@echo off\n",
             "chcp 65001 >nul\n",
@@ -739,9 +751,10 @@ def create_uninstaller():
             ")\n",
             "echo.\n",
             "echo  [1/2] Suppression du demarrage automatique...\n",
-            f'if exist "{startup_vbs}" (\n',
-            f'    del "{startup_vbs}" >nul 2>&1\n',
-            "    echo        OK : demarrage automatique supprime.\n",
+            f'schtasks /query /tn "{task_name}" >nul 2>&1\n',
+            "if %errorlevel%==0 (\n",
+            f'    schtasks /delete /tn "{task_name}" /f >nul 2>&1\n',
+            "    echo        OK : tache planifiee supprimee.\n",
             ") else (\n",
             "    echo        Deja absent.\n",
             ")\n",
