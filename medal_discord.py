@@ -117,8 +117,9 @@ CLIP_DUREE     = 20
 RETRY_UPLOAD   = 3
 
 # ── Auto-update depuis GitHub ─────────────────────────────────────────────────────
-VERSION     = "5.2"
+VERSION     = "5.3"
 PATCH_NOTES = [
+    "v5.3 : Message Discord enrichi avec emojis (jeu, pseudo, qualite, taille, duree, bitrate, heure)",
     "v5.2 : Repli CPU automatique par clip si l'encodage GPU echoue en cours de route (ex. driver NVIDIA trop ancien pour ffmpeg) — plus jamais de clip bloque",
     "v5.2 : Correction des options NVENC invalides (spatial-aq/temporal-aq) qui faisaient echouer tous les encodages GPU",
     "v5.1 : Repli CPU (libx264) automatique si aucune carte NVIDIA compatible n'est detectee",
@@ -477,10 +478,13 @@ def build_discord_message(game: str, size_mb: float,
                            duration: float, video_kbps: int) -> str:
     heure = datetime.now().strftime("%H:%M")
     return (
-        f"[Clip] {game}\n"
-        f"Joueur : {PSEUDO}\n"
-        f"720p 2-pass  |  {size_mb:.1f} MB  |  {duration:.0f}s  |  "
-        f"{video_kbps} kbps  |  {heure}"
+        f"🎮 **{game}**\n"
+        f"👤 {PSEUDO}\n"
+        f"📐 720p 2-pass  |  "
+        f"⚖️ {size_mb:.1f} MB  |  "
+        f"⏱️ {duration:.0f}s  |  "
+        f"📡 {video_kbps} kbps  |  "
+        f"⏰ {heure}"
     )
 
 def upload_discord(result_path: str, message: str) -> object:
