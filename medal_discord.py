@@ -117,8 +117,10 @@ CLIP_DUREE     = 20
 RETRY_UPLOAD   = 3
 
 # ── Auto-update depuis GitHub ─────────────────────────────────────────────────────
-VERSION     = "5.1"
+VERSION     = "5.2"
 PATCH_NOTES = [
+    "v5.2 : Repli CPU automatique par clip si l'encodage GPU echoue en cours de route (ex. driver NVIDIA trop ancien pour ffmpeg) — plus jamais de clip bloque",
+    "v5.2 : Correction des options NVENC invalides (spatial-aq/temporal-aq) qui faisaient echouer tous les encodages GPU",
     "v5.1 : Repli CPU (libx264) automatique si aucune carte NVIDIA compatible n'est detectee",
     "v5.0 : Mode fantome permanent — plus de tray, plus de console, plus de raccourcis clavier",
     "v5.0 : Toute la config se fait a l'installation (pseudo/dossier/webhooks) — plus de menu runtime",
@@ -372,10 +374,12 @@ def calcul_bitrate_video(duration_s: float, limit_mb: float = LIMIT_MB,
 # ── Encodage 2-pass (GPU NVIDIA si dispo, sinon CPU en repli automatique) ────────
 def encode_2pass(input_path: str, output_path: str,
                  trim_start: float, duration: float,
-                 video_bps: int) -> int:
+                 video_bps: int, encoder: str = None) -> int:
+    if encoder is None:
+        encoder = ENCODER
     passlog = os.path.join(TEMP_DIR, f"medal2pass-{os.getpid()}")
 
-    if ENCODER == "h264_nvenc":
+    if encoder == "h264_nvenc":
         base_args = [
             FFMPEG_PATH, "-y",
             "-hwaccel", "cuda",
@@ -388,15 +392,14 @@ def encode_2pass(input_path: str, output_path: str,
             "-b:v", f"{video_bps}",
             "-maxrate", f"{int(video_bps * 1.5)}",
             "-bufsize", f"{int(video_bps * 2)}",
-            "-spatial_aq", "1",
-            "-temporal_aq", "1",
+            "-spatial-aq", "1",
+            "-temporal-aq", "1",
             "-aq-strength", "8",
             "-rc-lookahead", "32",
             "-bf", "4",
             "-profile:v", "high",
             "-pix_fmt", "yuv420p",
             "-vf", "scale=1280:-2:flags=lanczos,unsharp=3:3:0.5:3:3:0.3",
-            "-passlogfile", passlog,
         ]
     else:
         # Repli CPU (libx264) : pas de carte NVIDIA compatible detectee.
@@ -418,12 +421,21 @@ def encode_2pass(input_path: str, output_path: str,
             "-passlogfile", passlog,
         ]
 
-    passes = [
-        base_args + ["-pass", "1", "-an", "-f", "null", "NUL"],
-        base_args + ["-pass", "2",
-                     "-acodec", "aac", "-b:a", f"{AUDIO_KBPS}k",
-                     "-movflags", "+faststart", output_path],
-    ]
+    if encoder == "h264_nvenc":
+        # h264_nvenc ne supporte pas le mecanisme generique -pass 1/2 de ffmpeg
+        # (il utilise son propre VBR interne) : un seul passage suffit et evite
+        # l'erreur "terminating thread with return code -22 (Invalid argument)".
+        passes = [
+            base_args + ["-acodec", "aac", "-b:a", f"{AUDIO_KBPS}k",
+                         "-movflags", "+faststart", output_path],
+        ]
+    else:
+        passes = [
+            base_args + ["-pass", "1", "-an", "-f", "null", "NUL"],
+            base_args + ["-pass", "2",
+                         "-acodec", "aac", "-b:a", f"{AUDIO_KBPS}k",
+                         "-movflags", "+faststart", output_path],
+        ]
 
     for cmd in passes:
         result = subprocess.run(cmd, capture_output=True, text=True,
@@ -440,6 +452,25 @@ def encode_2pass(input_path: str, output_path: str,
         except Exception: pass
 
     return os.path.getsize(output_path) if os.path.exists(output_path) else -1
+
+def encode_2pass_auto(input_path: str, output_path: str,
+                      trim_start: float, duration: float,
+                      video_bps: int) -> int:
+    """Enveloppe encode_2pass avec repli CPU automatique par clip.
+
+    Si l'encodage GPU echoue (ex. driver NVIDIA trop ancien pour la version
+    de ffmpeg utilisee), on bascule immediatement sur libx264 pour CE clip
+    et on desactive le GPU pour les clips suivants afin d'eviter de refaire
+    l'echec a chaque fois.
+    """
+    global ENCODER
+    result = encode_2pass(input_path, output_path, trim_start, duration, video_bps)
+    if result == -1 and ENCODER == "h264_nvenc":
+        ln_warn("Encodage GPU echoue (driver NVIDIA incompatible ?) — repli CPU (libx264) pour ce clip.")
+        ENCODER = "libx264"
+        result = encode_2pass(input_path, output_path, trim_start, duration, video_bps,
+                              encoder="libx264")
+    return result
 
 # ── Upload Discord ────────────────────────────────────────────────────────────────
 def build_discord_message(game: str, size_mb: float,
@@ -505,7 +536,7 @@ def process_clip(file_path: str):
 
     video_bps = calcul_bitrate_video(keep)
 
-    size = encode_2pass(file_path, converted, trim_start, keep, video_bps)
+    size = encode_2pass_auto(file_path, converted, trim_start, keep, video_bps)
 
     if size == -1:
         ln_err("Encodage echoue.")
@@ -517,7 +548,7 @@ def process_clip(file_path: str):
     if size > limit_bytes:
         ln_warn("Depassement — re-encodage avec marge plus stricte (88%)...")
         video_bps = calcul_bitrate_video(keep, marge=0.88)
-        size      = encode_2pass(file_path, converted, trim_start, keep, video_bps)
+        size      = encode_2pass_auto(file_path, converted, trim_start, keep, video_bps)
         if size == -1:
             ln_err("Re-encodage echoue.")
             with stats_lock: stats["echoues"] += 1
